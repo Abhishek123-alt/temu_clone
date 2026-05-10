@@ -8,7 +8,7 @@ import api from '../../services/api';
 
 const CheckoutPage = () => {
   const { items, clearCart } = useCartStore();
-  const { user } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [address, setAddress] = useState(user?.addresses?.[0]?.street || '');
@@ -49,7 +49,11 @@ const CheckoutPage = () => {
       // 2. Clear frontend cart (local state only, backend is already cleared by order service)
       clearCart();
 
-      // 3. Go to Payment
+      // 3. Refresh User Data to remove the used coupon from state
+      const userRes = await api.get('/user/me');
+      setUser(userRes.data);
+
+      // 4. Go to Payment
       navigate('/payment', { 
         state: { 
           orderId: response.data.id, 

@@ -7,8 +7,8 @@ from typing import List
 router = APIRouter()
 
 @router.get("/", response_model=List[schemas.ProductResponse])
-def read_products(skip: int = 0, limit: int = 20, search: str = None, db: Session = Depends(get_db)):
-    products = services.get_products(db, skip=skip, limit=limit, search=search)
+def read_products(skip: int = 0, limit: int = 20, search: str = None, deal_only: bool = False, normal_only: bool = False, category_id: str = None, db: Session = Depends(get_db)):
+    products = services.get_products(db, skip=skip, limit=limit, search=search, deal_only=deal_only, normal_only=normal_only, category_id=category_id)
     return products
 
 @router.get("/categories", response_model=List[schemas.CategoryResponse])

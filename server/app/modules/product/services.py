@@ -3,8 +3,16 @@ from app.modules.product.models import Product, Category
 from app.core.embeddings import generate_embedding
 from typing import List
 
-def get_products(db: Session, skip: int = 0, limit: int = 20, search: str = None):
+def get_products(db: Session, skip: int = 0, limit: int = 20, search: str = None, deal_only: bool = False, normal_only: bool = False, category_id: str = None):
     query = db.query(Product)
+    
+    if deal_only:
+        query = query.filter(Product.original_price != None, Product.original_price > Product.price)
+    if normal_only:
+        query = query.filter((Product.original_price == None) | (Product.original_price <= Product.price))
+    if category_id:
+        query = query.filter(Product.category_id == category_id)
+
     if search:
         # Generate embedding for the search query
         query_vector = generate_embedding(search)
