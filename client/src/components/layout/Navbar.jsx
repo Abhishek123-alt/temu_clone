@@ -4,6 +4,8 @@ import { ShoppingCart, User, Search, Menu, Bell, Heart, X } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useCartStore } from '../../store/cartStore';
 
+import CategoryDropdown from './CategoryDropdown';
+
 const Navbar = () => {
   const { user, isAuthenticated } = useAuthStore();
   const { getTotalItems } = useCartStore();
@@ -33,9 +35,10 @@ const Navbar = () => {
             <span className="text-3xl font-extrabold tracking-tighter text-[#fb7701]">TEMU</span>
           </Link>
 
-          {/* Search Bar */}
+          {/* Search Bar & Categories */}
           {shouldShowSearch ? (
-            <div className="hidden md:flex flex-grow max-w-2xl">
+            <div className="hidden md:flex flex-grow max-w-3xl items-center gap-2">
+              <CategoryDropdown />
               <form onSubmit={handleSearch} className="relative w-full">
                 <input
                   type="text"

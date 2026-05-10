@@ -1,8 +1,11 @@
 import api from './api';
 
 export const productService = {
-  getProducts: async (skip = 0, limit = 20, search = '') => {
-    const url = `/products/?skip=${skip}&limit=${limit}${search ? `&search=${search}` : ''}`;
+  getProducts: async (skip = 0, limit = 20, search = '', dealOnly = false, normalOnly = false, categoryId = null) => {
+    let url = `/products/?skip=${skip}&limit=${limit}&search=${encodeURIComponent(search)}`;
+    if (dealOnly) url += '&deal_only=true';
+    if (normalOnly) url += '&normal_only=true';
+    if (categoryId) url += `&category_id=${categoryId}`;
     const response = await api.get(url);
     return response.data;
   },

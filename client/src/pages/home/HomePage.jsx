@@ -19,7 +19,9 @@ const HomePage = () => {
       try {
         const queryParams = new URLSearchParams(location.search);
         const search = queryParams.get('search') || '';
-        const data = await productService.getProducts(0, 50, search);
+        const category_id = queryParams.get('category_id');
+        // Fetch normal products only (no discounts) for the homepage, filtered by category
+        const data = await productService.getProducts(0, 50, search, false, true, category_id);
         setProducts(data);
       } catch (error) {
         console.error('Failed to fetch products:', error);
@@ -30,7 +32,7 @@ const HomePage = () => {
     fetchProducts();
   }, [location.search]);
 
-  if (loading) {
+  if (loading && products.length === 0) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="w-10 h-10 border-4 border-[#fb7701] border-t-transparent rounded-full animate-spin"></div>
@@ -41,7 +43,7 @@ const HomePage = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Banner/Hero placeholder */}
-      <div className="bg-orange-50 rounded-[32px] p-8 md:p-16 mb-12 text-center md:text-left relative overflow-hidden">
+      <div className="bg-orange-50 rounded-[32px] p-8 md:p-16 mb-8 text-center md:text-left relative overflow-hidden">
         <div className="relative z-10">
           <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight">
             Shop like a <br /><span className="text-[#fb7701]">Billionaire</span>
@@ -49,15 +51,17 @@ const HomePage = () => {
           <p className="text-gray-600 mt-4 text-lg font-medium max-w-md">
             Unbeatable prices on millions of quality items. Free shipping on all orders.
           </p>
-          <button className="btn-primary mt-8 py-4 px-10 text-xl">
+          <button 
+            onClick={() => navigate('/deals')}
+            className="btn-primary mt-8 py-4 px-10 text-xl"
+          >
             Explore Deals
           </button>
         </div>
         <div className="absolute top-0 right-0 w-1/3 h-full bg-orange-100 hidden md:block rounded-l-full transform translate-x-12"></div>
       </div>
 
-      {/* Product Feed */}
-      <div className="mb-10 flex items-center justify-between">
+      <div id="product-feed" className="mb-8 flex items-center justify-between scroll-mt-24">
         <h2 className="text-2xl font-extrabold text-gray-900">Recommended for You</h2>
         <a href="#" className="text-[#fb7701] font-bold hover:underline">View All</a>
       </div>

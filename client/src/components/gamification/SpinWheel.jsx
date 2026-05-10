@@ -135,18 +135,18 @@ const SpinWheel = ({ isOpen, onClose }) => {
                           strokeWidth="0.2"
                         />
                         {/* Intelligent Label: Flips 180 if in bottom half so it's never upside down */}
-                        <g transform={`rotate(${angle / 2} 75 50)`}>
+                        <g transform={`rotate(${angle / 2} 50 50)`}>
                           <text
-                            x="82"
+                            x="75"
                             y="50"
                             fill="white"
-                            fontSize="2.8"
+                            fontSize="4.5"
                             fontWeight="900"
-                            transform={(rotation + angle/2 > 90 && rotation + angle/2 < 270) ? "rotate(180 82 50)" : ""}
-                            className="uppercase tracking-tighter"
+                            transform={(rotation + angle/2 > 90 && rotation + angle/2 < 270) ? "rotate(180 75 50)" : ""}
+                            className="uppercase tracking-tight"
                             textAnchor="middle"
-                            dominantBaseline="middle"
-                            style={{ textShadow: '0px 1px 2px rgba(0,0,0,0.4)' }}
+                            dominantBaseline="central"
+                            style={{ textShadow: '0px 1px 3px rgba(0,0,0,0.8)' }}
                           >
                             {prize.label}
                           </text>
