@@ -5,6 +5,9 @@ from app.modules.product.router import router as product_router
 from app.modules.admin.router import router as admin_router
 from app.modules.cart.router import router as cart_router
 from app.modules.order.router import router as order_router
+from app.modules.flash_sale.router import router as flash_sale_router
+from app.modules.quest.router import router as quest_router
+from app.modules.review.router import router as review_router
 
 api_router = APIRouter()
 
@@ -14,3 +17,7 @@ api_router.include_router(product_router, prefix="/products", tags=["products"])
 api_router.include_router(admin_router, prefix="/admin", tags=["admin"])
 api_router.include_router(cart_router, prefix="/cart", tags=["cart"])
 api_router.include_router(order_router, prefix="/orders", tags=["orders"])
+api_router.include_router(flash_sale_router, prefix="/flash-sales", tags=["flash sales"])
+api_router.include_router(quest_router, prefix="/quests", tags=["quests"])
+api_router.include_router(review_router, prefix="/reviews", tags=["reviews"])
+api_router.include_router(flash_sale_router, prefix="/flash-sales", tags=["flash sales"])

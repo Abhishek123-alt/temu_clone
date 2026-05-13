@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { MapPin, Plus, Trash2, Home, Briefcase, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 const AddressesPage = () => {
   const { user, setUser } = useAuthStore();
@@ -14,6 +15,7 @@ const AddressesPage = () => {
     street: '', city: '', state: '', zip: '', country: 'India', is_default: false
   });
   const [loading, setLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, addressId: null });
 
   const handleAddAddress = async (e) => {
     e.preventDefault();
@@ -51,7 +53,6 @@ const AddressesPage = () => {
   };
 
   const handleDelete = async (addressId) => {
-    if (!window.confirm("Are you sure you want to delete this address?")) return;
     try {
       await api.delete(`/user/addresses/${addressId}`);
       // Refresh user in store
@@ -73,12 +74,18 @@ const AddressesPage = () => {
 
       <div className="flex justify-between items-center mb-10">
         <h1 className="text-3xl font-extrabold text-gray-900">Your Addresses</h1>
-        <button 
-          onClick={() => setShowModal(true)}
-          className="bg-[#fb7701] text-white px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:bg-[#e06a01] transition-all"
-        >
-          <Plus size={20} /> Add New
-        </button>
+        {user?.addresses && user.addresses.length < 3 ? (
+          <button 
+            onClick={() => setShowModal(true)}
+            className="bg-[#fb7701] text-white px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:bg-[#e06a01] transition-all shadow-lg shadow-orange-100"
+          >
+            <Plus size={20} /> Add New
+          </button>
+        ) : (
+          <div className="bg-orange-50 text-[#fb7701] px-4 py-2 rounded-full text-xs font-bold border border-orange-100">
+            Max 3 addresses reached
+          </div>
+        )}
       </div>
 
       {/* Add Address Modal */}
@@ -179,7 +186,7 @@ const AddressesPage = () => {
                   <Home size={20} />
                 </div>
                 <button 
-                  onClick={() => handleDelete(address.id)}
+                  onClick={() => setConfirmDelete({ isOpen: true, addressId: address.id })}
                   className="text-gray-300 hover:text-red-500 transition-colors p-1"
                 >
                   <Trash2 size={18} />
@@ -210,6 +217,17 @@ const AddressesPage = () => {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation */}
+      <ConfirmModal 
+        isOpen={confirmDelete.isOpen}
+        onClose={() => setConfirmDelete({ isOpen: false, addressId: null })}
+        onConfirm={() => handleDelete(confirmDelete.addressId)}
+        title="Remove Address?"
+        message="Are you sure you want to delete this shipping address from your profile?"
+        confirmText="Remove Address"
+        type="primary"
+      />
     </div>
   );
 };

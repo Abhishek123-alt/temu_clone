@@ -3,9 +3,12 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Star, ShoppingCart, Check } from 'lucide-react';
 import { useCartStore } from '../../store/cartStore';
+import { useWishlistStore } from '../../store/wishlistStore';
+import { Heart } from 'lucide-react';
 
 const ProductCard = ({ product }) => {
   const { addToCart } = useCartStore();
+  const { toggleWishlist, isInWishlist } = useWishlistStore();
   const [adding, setAdding] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -14,7 +17,7 @@ const ProductCard = ({ product }) => {
     e.stopPropagation();
     setAdding(true);
     try {
-      await addToCart(product.id, 1);
+      await addToCart(product.id, null, 1);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (error) {
@@ -23,7 +26,9 @@ const ProductCard = ({ product }) => {
       setAdding(false);
     }
   };
-  const mainImage = product.images.find(img => img.is_main)?.url || product.images[0]?.url;
+  const mainImage = product.images?.length > 0 
+    ? (product.images.find(img => img.is_main)?.url || product.images[0]?.url)
+    : 'https://via.placeholder.com/400x400?text=No+Image';
   const discount = product.original_price 
     ? Math.round(((product.original_price - product.price) / product.original_price) * 100) 
     : 0;
@@ -46,6 +51,22 @@ const ProductCard = ({ product }) => {
               -{discount}%
             </div>
           )}
+          
+          {/* Wishlist Button Overlay */}
+          <button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleWishlist(product);
+            }}
+            className={`absolute top-2 right-2 p-1.5 rounded-full shadow-sm transition-all z-10 ${
+              isInWishlist(product.id)
+              ? 'bg-red-50 text-red-500'
+              : 'bg-white/80 text-gray-400 hover:text-red-500'
+            }`}
+          >
+            <Heart size={16} fill={isInWishlist(product.id) ? "currentColor" : "none"} />
+          </button>
         </div>
 
         {/* Content */}

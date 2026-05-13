@@ -1,17 +1,26 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Search, Menu, Bell, Heart, X } from 'lucide-react';
+import { ShoppingCart, User, Search, Menu, Bell, Heart, X, Trophy } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useCartStore } from '../../store/cartStore';
+import { useWishlistStore } from '../../store/wishlistStore';
+import { useEffect } from 'react';
 
 import CategoryDropdown from './CategoryDropdown';
 
 const Navbar = () => {
   const { user, isAuthenticated } = useAuthStore();
   const { getTotalItems } = useCartStore();
+  const { wishlist, fetchWishlist } = useWishlistStore();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchWishlist();
+    }
+  }, [isAuthenticated, fetchWishlist]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -31,7 +40,7 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-16 lg:h-20 gap-4">
           {/* Logo */}
-          <Link to="/" className="flex-shrink-0 flex items-center">
+          <Link to={isAuthenticated ? (user?.role === 'Seller' ? '/seller' : (user?.role === 'Admin' ? '/admin' : '/')) : '/'} className="flex-shrink-0 flex items-center">
             <span className="text-3xl font-extrabold tracking-tighter text-[#fb7701]">TEMU</span>
           </Link>
 
@@ -91,15 +100,34 @@ const Navbar = () => {
               </Link>
             )}
 
-            <Link to="/cart" className="flex flex-col items-center relative text-gray-700 hover:text-[#fb7701] transition-colors">
-              <ShoppingCart size={24} />
-              <span className="text-[10px] font-medium hidden lg:block">Cart</span>
-              {getTotalItems() > 0 && (
-                <span className="absolute -top-1 -right-1 bg-[#fb7701] text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                  {getTotalItems()}
-                </span>
-              )}
-            </Link>
+            {user?.role !== 'Seller' && user?.role !== 'Admin' && (
+              <>
+                <Link to="/profile/quests" className="flex flex-col items-center relative text-gray-700 hover:text-[#fb7701] transition-colors">
+                  <Trophy size={24} />
+                  <span className="text-[10px] font-medium hidden lg:block">Quests</span>
+                </Link>
+
+                <Link to="/wishlist" className="flex flex-col items-center relative text-gray-700 hover:text-[#fb7701] transition-colors">
+                  <Heart size={24} />
+                  <span className="text-[10px] font-medium hidden lg:block">Wishlist</span>
+                  {wishlist.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                      {wishlist.length}
+                    </span>
+                  )}
+                </Link>
+
+                <Link to="/cart" className="flex flex-col items-center relative text-gray-700 hover:text-[#fb7701] transition-colors">
+                  <ShoppingCart size={24} />
+                  <span className="text-[10px] font-medium hidden lg:block">Cart</span>
+                  {getTotalItems() > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-[#fb7701] text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                      {getTotalItems()}
+                    </span>
+                  )}
+                </Link>
+              </>
+            )}
 
             <button className="md:hidden text-gray-700 p-2">
               <Menu size={24} />

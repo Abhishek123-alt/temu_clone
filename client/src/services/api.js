@@ -23,6 +23,13 @@ api.interceptors.response.use(
   },
   (error) => {
     console.error('❌ API Error:', error.response?.status, error.config?.url, error.response?.data);
+    
+    // Automatically log out if token expires (401 Unauthorized)
+    if (error.response && error.response.status === 401) {
+      useAuthStore.getState().logout();
+      window.location.href = '/login';
+    }
+    
     return Promise.reject(error);
   }
 );

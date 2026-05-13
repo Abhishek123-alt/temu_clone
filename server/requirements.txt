@@ -11,3 +11,5 @@ python-multipart
 python-dotenv
 pytest
 httpx
+pgvector
+sentence-transformers

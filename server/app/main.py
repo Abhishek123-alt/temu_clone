@@ -1,7 +1,12 @@
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
 from app.api.v1.api import api_router
+
+# Create uploads directory
+os.makedirs("uploads", exist_ok=True)
 
 # Configure logging
 logging.basicConfig(
@@ -27,6 +32,9 @@ app.add_middleware(
 
 # Include central router
 app.include_router(api_router, prefix="/api/v1")
+
+# Mount static files for uploads
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 @app.get("/")
 def root():

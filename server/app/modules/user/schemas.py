@@ -21,6 +21,23 @@ class AddressResponse(AddressBase):
     class Config:
         from_attributes = True
 
+class PaymentMethodBase(BaseModel):
+    brand: str
+    last4: str
+    exp_month: int
+    exp_year: int
+    is_default: bool = False
+
+class PaymentMethodCreate(PaymentMethodBase):
+    pass
+
+class PaymentMethodResponse(PaymentMethodBase):
+    id: UUID
+    user_id: UUID
+
+    class Config:
+        from_attributes = True
+
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
@@ -31,10 +48,11 @@ class UserProfile(BaseModel):
     full_name: str
     phone: Optional[str]
     role: str
-    spins_left: int
+    spins_left: Optional[int] = 0
     created_at: datetime
     addresses: List[AddressResponse] = []
     rewards: List["RewardResponse"] = []
+    payment_methods: List[PaymentMethodResponse] = []
 
     class Config:
         from_attributes = True

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.modules.auth import schemas, services
 from app.core import security
+from app.modules.user import services as user_services
 
 router = APIRouter()
 
@@ -14,7 +15,24 @@ def register(user_in: schemas.UserRegister, db: Session = Depends(get_db)):
             status_code=400,
             detail="User with this email already exists."
         )
-    return services.create_user(db, user_in)
+    # Create the new user first
+    new_user = services.create_user(db, user_in)
+    # If a referral code was supplied, attempt to process it
+    if user_in.referral_code:
+        success = user_services.process_referral(db, new_user.id, user_in.referral_code.strip())
+        if not success:
+            # Invalid code – you can choose to abort registration or ignore.
+            # Here we abort with a clear message.
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid referral code."
+            )
+    # Refresh to load relationships (rewards, etc.)
+    db.refresh(new_user)
+    return new_user
+
+
+from app.modules.quest import services as quest_services
 
 @router.post("/login", response_model=schemas.Token)
 def login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
@@ -25,5 +43,8 @@ def login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    quest_services.update_quest_progress(db, user.id, "DAILY_LOGIN")
+    
     access_token = security.create_access_token(subject=user.id)
     return {"access_token": access_token, "token_type": "bearer"}

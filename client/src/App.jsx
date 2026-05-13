@@ -5,7 +5,10 @@ import DealsPage from './pages/home/DealsPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ProfilePage from './pages/profile/ProfilePage';
+import QuestsPage from './pages/profile/QuestsPage';
+import WishlistPage from './pages/wishlist/WishlistPage';
 import AddressesPage from './pages/profile/AddressesPage';
+import PaymentMethodsPage from './pages/profile/PaymentMethodsPage';
 import SellerDashboard from './pages/seller/SellerDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import CartPage from './pages/cart/CartPage';
@@ -16,6 +19,7 @@ import OrderDetailPage from './pages/orders/OrderDetailPage';
 import ProductDetailPage from './pages/product/ProductDetailPage';
 import Layout from './components/layout/Layout';
 import { useAuthStore } from './store/authStore';
+import Toast from './components/common/Toast';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -23,9 +27,12 @@ const ProtectedRoute = ({ children }) => {
   return isAuthenticated ? children : <Navigate to="/login" />;
 };
 
+import NewArrivalsPage from './pages/home/NewArrivalsPage';
+
 function App() {
   return (
     <Router>
+      <Toast />
       <Layout>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -47,6 +54,14 @@ function App() {
             } 
           />
           <Route 
+            path="/new-arrivals" 
+            element={
+              <ProtectedRoute>
+                <NewArrivalsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/profile" 
             element={
               <ProtectedRoute>
@@ -55,10 +70,34 @@ function App() {
             } 
           />
           <Route 
+            path="/profile/quests" 
+            element={
+              <ProtectedRoute>
+                <QuestsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/wishlist" 
+            element={
+              <ProtectedRoute>
+                <WishlistPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/profile/addresses" 
             element={
               <ProtectedRoute>
                 <AddressesPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/profile/payment-methods" 
+            element={
+              <ProtectedRoute>
+                <PaymentMethodsPage />
               </ProtectedRoute>
             } 
           />

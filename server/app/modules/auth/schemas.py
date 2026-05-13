@@ -14,6 +14,7 @@ class UserRegister(BaseModel):
     password: str
     full_name: str
     phone: Optional[str] = None
+    referral_code: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
