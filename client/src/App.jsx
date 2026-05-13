@@ -28,6 +28,7 @@ const ProtectedRoute = ({ children }) => {
 };
 
 import NewArrivalsPage from './pages/home/NewArrivalsPage';
+import SearchPage from './pages/product/SearchPage';
 
 function App() {
   return (
@@ -158,6 +159,14 @@ function App() {
             } 
           />
           <Route path="/product/:slug" element={<ProductDetailPage />} />
+          <Route 
+            path="/search" 
+            element={
+              <ProtectedRoute>
+                <SearchPage />
+              </ProtectedRoute>
+            } 
+          />
         </Routes>
       </Layout>
     </Router>

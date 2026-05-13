@@ -7,6 +7,7 @@ import { Gift, Zap, Star, Sparkles } from 'lucide-react';
 import SpinWheel from '../../components/gamification/SpinWheel';
 import MarketingCarousel from '../../components/marketing/MarketingCarousel';
 import FlashSaleSection from '../../components/marketing/FlashSaleSection';
+import CategoryRail from '../../components/products/CategoryRail';
 
 const HomePage = () => {
   const [products, setProducts] = useState([]);
@@ -27,7 +28,7 @@ const HomePage = () => {
         const new_arrivals = queryParams.get('new_arrivals') === 'true';
         
         const [productsData, categoriesData] = await Promise.all([
-          productService.getProducts(0, 50, search, false, true, category_id, new_arrivals),
+          productService.getProducts(0, 50, search, false, false, category_id, new_arrivals),
           productService.getCategories()
         ]);
         
@@ -60,7 +61,12 @@ const HomePage = () => {
       {/* Flash Sale Section */}
       <FlashSaleSection />
 
-      <div id="product-feed" className="mb-8 flex items-center justify-between scroll-mt-24">
+      <CategoryRail 
+        categories={categories} 
+        activeCategoryId={activeCategoryId} 
+      />
+
+      <div id="product-feed" className="mb-8 flex items-center justify-between scroll-mt-40">
         <h2 className="text-2xl font-extrabold text-gray-900">
           {queryParams.get('new_arrivals') === 'true' ? 'New Arrivals' : 'Recommended for You'}
         </h2>
@@ -75,7 +81,9 @@ const HomePage = () => {
 
       {products.length === 0 && (
         <div className="text-center py-20">
-          <p className="text-xl font-bold text-gray-400">No products found matching your search.</p>
+          <p className="text-xl font-bold text-gray-400">
+            {queryParams.get('search') ? `No products found matching "${queryParams.get('search')}"` : 'No products found matching your criteria.'}
+          </p>
           <button
             onClick={() => navigate('/')}
             className="text-[#fb7701] font-bold mt-4 hover:underline"

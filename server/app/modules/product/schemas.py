@@ -39,6 +39,7 @@ class ProductBase(BaseModel):
     stock: int
     rating: float = 0.0
     review_count: int = 0
+    sales_count: int = 0
     category_id: UUID
     seller_id: UUID
 

@@ -75,11 +75,14 @@ const ProductCard = ({ product }) => {
             {product.title}
           </h3>
           
-          <div className="flex items-center gap-1 mb-2">
-            <div className="flex text-yellow-400">
-              <Star size={12} fill="currentColor" />
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1">
+              <div className="flex text-yellow-400">
+                <Star size={12} fill="currentColor" />
+              </div>
+              <span className="text-[10px] text-gray-400 font-bold">{product.rating}</span>
             </div>
-            <span className="text-[10px] text-gray-400 font-bold">{product.rating} ({product.review_count})</span>
+            <span className="text-[10px] text-gray-400 font-bold bg-gray-100 px-1.5 py-0.5 rounded">{product.sales_count || 0} sold</span>
           </div>
 
           <div className="flex items-baseline gap-2">
