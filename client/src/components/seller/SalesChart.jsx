@@ -15,15 +15,30 @@ const SalesChart = ({ data = [] }) => {
     { day: 'Sun', sales: 2100 },
   ];
 
-  const maxSales = Math.max(...chartData.map(d => d.sales), 1); // Avoid division by zero
-  const height = 200;
+  const maxSales = Math.max(...chartData.map(d => d.sales), 1);
+  const chartWidth = 800;
+  const chartHeight = 200;
+  const padding = 40;
+
+  const getPoints = () => {
+    return chartData.map((d, i) => {
+      const divisor = chartData.length > 1 ? chartData.length - 1 : 1;
+      const x = (i / divisor) * (chartWidth - padding * 2) + padding;
+      const y = chartHeight - (d.sales / maxSales) * (chartHeight - padding) - padding;
+      return { x, y, sales: d.sales, label: d.label };
+    });
+  };
+
+  const points = getPoints();
+  const linePath = points.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ');
+  const areaPath = `${linePath} L ${points[points.length - 1].x} ${chartHeight} L ${points[0].x} ${chartHeight} Z`;
 
   return (
-    <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden group">
+    <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden group h-full">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h3 className="text-xl font-bold text-gray-900">Weekly Revenue</h3>
-          <p className="text-sm text-gray-400 font-medium">Interactive sales performance</p>
+          <h3 className="text-xl font-bold text-gray-900">Revenue Analysis</h3>
+          <p className="text-sm text-gray-400 font-medium">Sales performance over time</p>
         </div>
         <div className="flex gap-2">
           <div className="flex items-center gap-2">
@@ -33,54 +48,96 @@ const SalesChart = ({ data = [] }) => {
         </div>
       </div>
 
-      <div className="relative h-[240px] flex items-end justify-between gap-2 px-2">
-        {chartData.map((d, i) => {
-          const barHeight = (d.sales / maxSales) * height;
-          return (
-            <div 
-              key={i} 
-              className="flex-1 flex flex-col items-center group/bar"
-              onMouseEnter={() => setHoveredIndex(i)}
-              onMouseLeave={() => setHoveredIndex(null)}
-            >
-              <div className="relative w-full flex flex-col items-center">
-                <AnimatePresence>
-                  {hoveredIndex === i && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10, scale: 0.5 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.5 }}
-                      className="absolute -top-12 bg-gray-900 text-white px-3 py-1.5 rounded-xl text-xs font-bold z-10 whitespace-nowrap shadow-xl"
-                    >
-                      ${d.sales.toLocaleString()}
-                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45" />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                
-                <motion.div 
-                  initial={{ height: 0 }}
-                  animate={{ height: barHeight }}
-                  transition={{ type: 'spring', damping: 20, stiffness: 100, delay: i * 0.1 }}
-                  className={`w-full max-w-[40px] rounded-t-2xl transition-all duration-300 ${
-                    hoveredIndex === i ? 'bg-[#fb7701] shadow-lg shadow-orange-100' : 'bg-orange-50 group-hover/bar:bg-orange-100'
-                  }`}
-                />
-              </div>
-              <span className={`mt-4 text-[10px] font-black uppercase tracking-widest transition-colors ${
-                hoveredIndex === i ? 'text-[#fb7701]' : 'text-gray-400'
-              }`}>
-                {d.day}
-              </span>
-            </div>
-          );
-        })}
+      <div className="relative h-[240px] w-full">
+        <svg 
+          viewBox={`0 0 ${chartWidth} ${chartHeight}`} 
+          className="w-full h-full overflow-visible"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#fb7701" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#fb7701" stopOpacity="0" />
+            </linearGradient>
+          </defs>
 
-        {/* Grid lines */}
-        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-[0.03]">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="w-full h-px bg-gray-900" />
+          {/* Area under the line */}
+          <motion.path
+            initial={{ d: `M ${points[0].x} ${chartHeight} L ${points[0].x} ${chartHeight} Z`, opacity: 0 }}
+            animate={{ d: areaPath, opacity: 1 }}
+            transition={{ duration: 1, ease: "easeOut" }}
+            fill="url(#areaGradient)"
+          />
+
+          {/* The Line */}
+          <motion.path
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{ duration: 1.5, ease: "easeInOut" }}
+            d={linePath}
+            fill="none"
+            stroke="#fb7701"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+
+          {/* Interaction Points */}
+          {points.map((p, i) => (
+            <g key={i} onMouseEnter={() => setHoveredIndex(i)} onMouseLeave={() => setHoveredIndex(null)} className="cursor-pointer">
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r="6"
+                fill="white"
+                stroke="#fb7701"
+                strokeWidth="2"
+                className={`transition-all duration-300 ${hoveredIndex === i ? 'r-8 stroke-[4px]' : 'opacity-0 group-hover:opacity-100'}`}
+              />
+              {/* Invisible touch area */}
+              <circle cx={p.x} cy={p.y} r="20" fill="transparent" />
+            </g>
           ))}
+        </svg>
+
+        {/* Tooltip */}
+        <AnimatePresence>
+          {hoveredIndex !== null && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.9 }}
+              animate={{ 
+                opacity: 1, 
+                y: 0, 
+                scale: 1,
+                left: `${(points[hoveredIndex].x / chartWidth) * 100}%`,
+                top: `${(points[hoveredIndex].y / chartHeight) * 100 - 15}%`
+              }}
+              exit={{ opacity: 0, y: 10, scale: 0.9 }}
+              className="absolute -translate-x-1/2 -translate-y-full bg-gray-900 text-white px-4 py-2 rounded-2xl text-xs font-black z-50 shadow-2xl pointer-events-none"
+            >
+              <div className="text-[8px] uppercase tracking-tighter opacity-50 mb-0.5">{points[hoveredIndex].label}</div>
+              ${points[hoveredIndex].sales.toLocaleString()}
+              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* X-Axis Labels */}
+        <div className="absolute bottom-0 left-0 w-full flex justify-between px-[5%] translate-y-8">
+          {points.map((p, i) => {
+            const showLabel = chartData.length > 10 ? (i % Math.ceil(chartData.length / 8) === 0) : true;
+            return (
+              <span 
+                key={i} 
+                className={`text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
+                  hoveredIndex === i ? 'text-[#fb7701] scale-110' : 'text-gray-400'
+                }`}
+                style={{ opacity: showLabel || hoveredIndex === i ? 1 : 0 }}
+              >
+                {p.label}
+              </span>
+            );
+          })}
         </div>
       </div>
     </div>

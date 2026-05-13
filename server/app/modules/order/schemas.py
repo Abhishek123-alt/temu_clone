@@ -82,6 +82,7 @@ class OrderResponse(OrderBase):
     events: List[OrderEventResponse] = []
     shipments: List[ShipmentResponse] = []
     returns: List[ReturnResponse] = []
+    customer_name: Optional[str] = None
 
     class Config:
         from_attributes = True

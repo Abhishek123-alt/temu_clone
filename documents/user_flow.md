@@ -32,9 +32,19 @@ Engagement is driven by games and "free gift" mechanics.
 2.  **Real-time Updates:** Push notifications at every milestone (Shipped, Out for Delivery, Delivered).
 3.  **Returns:** One-click return initiation for eligible items.
 
+## 5. Seller Management Flow (Implemented)
+1.  **Inventory Management:** Seller logs in -> Adds/Edits product -> Uploads images -> Sets pricing/stock.
+2.  **Order Fulfillment:** Seller receives "Paid" order -> Clicks "Ship Now" -> Enters carrier and tracking number -> Order status updates to "Shipped".
+3.  **Return Processing:** Seller views return request -> Reviews reason -> Approves or Rejects the return.
+4.  **Analytics Tracking:** Seller views Revenue Analysis chart -> Filters by date range to monitor growth.
+
+## 6. Admin Oversight Flow (Implemented)
+1.  **Platform Monitoring:** Admin logs in -> Views global stats (Total Sales, Total Customers, Active Products).
+2.  **User Audit:** Admin views list of all registered users to manage platform participants.
+
 ---
 
-## 5. Viral Growth Flow (Referrals)
+## 7. Viral Growth Flow (Referrals)
 1.  **Invite:** User clicks "Earn $20 Credit."
 2.  **Share:** Copy unique link or share directly to WhatsApp/Social Media.
 3.  **Reward:** Once the referred user completes their first order, the referrer receives credit.

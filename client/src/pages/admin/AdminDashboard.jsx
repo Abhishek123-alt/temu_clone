@@ -83,7 +83,7 @@ const AdminDashboard = () => {
           onClick={() => setActiveTab('campaigns')}
           className={`px-8 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'campaigns' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
         >
-          Campaigns
+          Flash Sales
         </button>
       </div>
 
@@ -633,20 +633,131 @@ const DisputeManagement = () => {
 const CampaignControl = () => {
   const [flashSales, setFlashSales] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [products, setProducts] = useState([]);
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    start_time: '',
+    end_time: '',
+    is_active: true,
+    selected_products: [] // { product_id, discounted_price }
+  });
+  const [saving, setSaving] = useState(false);
+
+  const [editingCampaign, setEditingCampaign] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
+
+  const fetchCampaigns = async () => {
+    try {
+      const res = await api.get('/flash-sales/all'); 
+      setFlashSales(res.data);
+    } catch (error) {
+      const res = await api.get('/flash-sales/active'); 
+      setFlashSales(res.data);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const res = await api.get('/products');
+      setProducts(res.data);
+    } catch (error) { console.error(error); }
+  };
 
   useEffect(() => {
-    const fetchCampaigns = async () => {
-      try {
-        const res = await api.get('/products/flash-sales');
-        setFlashSales(res.data);
-      } catch (error) {
-        console.error('Failed to fetch campaigns:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchCampaigns();
+    fetchProducts();
   }, []);
+
+  const handleOpenModal = (campaign = null) => {
+    if (campaign) {
+      setEditingCampaign(campaign);
+      // Format dates for datetime-local input (YYYY-MM-DDTHH:MM)
+      const start = new Date(campaign.start_time);
+      const end = new Date(campaign.end_time);
+      setFormData({
+        name: campaign.name,
+        description: campaign.description || '',
+        start_time: new Date(start.getTime() - start.getTimezoneOffset() * 60000).toISOString().slice(0, 16),
+        end_time: new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().slice(0, 16),
+        is_active: campaign.is_active,
+        selected_products: campaign.products.map(p => ({
+          product_id: p.product_id,
+          discounted_price: p.discounted_price
+        }))
+      });
+    } else {
+      setEditingCampaign(null);
+      setFormData({
+        name: '',
+        description: '',
+        start_time: '',
+        end_time: '',
+        is_active: true,
+        selected_products: []
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    const { id } = confirmDelete;
+    try {
+      await api.delete(`/flash-sales/admin/${id}`);
+      toast.success("Campaign deleted");
+      setConfirmDelete({ isOpen: false, id: null });
+      fetchCampaigns();
+    } catch (error) {
+      toast.error("Failed to delete campaign");
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    const start = new Date(formData.start_time);
+    const end = new Date(formData.end_time);
+    const now = new Date();
+
+    if (start < now) {
+      toast.error("Start time cannot be in the past");
+      return;
+    }
+    if (end <= start) {
+      toast.error("End time must be after start time");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = {
+        name: formData.name,
+        description: formData.description,
+        start_time: new Date(formData.start_time).toISOString(),
+        end_time: new Date(formData.end_time).toISOString(),
+        is_active: formData.is_active,
+        products: formData.selected_products
+      };
+      
+      if (editingCampaign) {
+        await api.put(`/flash-sales/admin/${editingCampaign.id}`, payload);
+        toast.success("Campaign updated successfully!");
+      } else {
+        await api.post('/flash-sales/admin', payload);
+        toast.success("Campaign launched successfully!");
+      }
+      
+      setIsModalOpen(false);
+      fetchCampaigns();
+    } catch (error) {
+      toast.error(editingCampaign ? "Failed to update campaign" : "Failed to launch campaign");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) return <div className="p-10 text-center text-gray-400">Loading campaigns...</div>;
 
@@ -654,28 +765,62 @@ const CampaignControl = () => {
     <div>
       <div className="p-8 border-b border-gray-50 flex justify-between items-center">
         <h3 className="text-xl font-bold text-gray-900">Active Campaigns</h3>
-        <button className="bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-black transition-all">
+        <button 
+          onClick={() => handleOpenModal()}
+          className="bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-black transition-all"
+        >
           <Megaphone size={16} /> New Campaign
         </button>
       </div>
       <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
         {flashSales.map((fs) => (
-          <div key={fs.id} className="bg-gray-50 p-6 rounded-3xl border border-gray-100">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-white rounded-2xl text-[#fb7701] shadow-sm">
-                <Megaphone size={20} />
+          <div key={fs.id} className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-gray-50 rounded-2xl text-[#fb7701]">
+                  <Megaphone size={24} />
+                </div>
+                <div>
+                  <h4 className="text-xl font-black text-gray-900 leading-tight">{fs.name}</h4>
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mt-1">Marketing Event</p>
+                </div>
               </div>
               <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                fs.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'
+                fs.is_active ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'
               }`}>
-                {fs.is_active ? 'Active' : 'Inactive'}
+                {fs.is_active ? 'Active' : 'Paused'}
               </span>
             </div>
-            <h4 className="text-lg font-bold text-gray-900 mb-2">{fs.title}</h4>
-            <div className="flex items-center gap-4 text-xs font-bold text-gray-400">
-              <span>{new Date(fs.start_time).toLocaleDateString()}</span>
-              <span>→</span>
-              <span>{new Date(fs.end_time).toLocaleDateString()}</span>
+            
+            <div className="flex items-center justify-between py-4 border-y border-gray-50 mb-6">
+              <div className="text-center">
+                <p className="text-[8px] font-black uppercase text-gray-400 mb-1">Start Date</p>
+                <p className="text-xs font-bold text-gray-700">{new Date(fs.start_time).toLocaleDateString()}</p>
+              </div>
+              <div className="text-gray-200">→</div>
+              <div className="text-center">
+                <p className="text-[8px] font-black uppercase text-gray-400 mb-1">End Date</p>
+                <p className="text-xs font-bold text-gray-700">{new Date(fs.end_time).toLocaleDateString()}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[8px] font-black uppercase text-gray-400 mb-1">Products</p>
+                <p className="text-xs font-black text-[#fb7701]">{fs.products?.length || 0}</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => handleOpenModal(fs)}
+                className="flex-1 px-4 py-3 bg-gray-50 text-gray-900 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-gray-100 transition-all flex items-center justify-center gap-2"
+              >
+                <Edit2 size={14} /> Edit
+              </button>
+              <button 
+                onClick={() => setConfirmDelete({ isOpen: true, id: fs.id })}
+                className="p-3 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"
+              >
+                <Trash2 size={18} />
+              </button>
             </div>
           </div>
         ))}
@@ -683,6 +828,148 @@ const CampaignControl = () => {
           <div className="col-span-full py-10 text-center text-gray-400 font-medium">No marketing campaigns active.</div>
         )}
       </div>
+
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsModalOpen(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white rounded-[40px] shadow-2xl p-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-2xl font-black text-gray-900">{editingCampaign ? 'Update Campaign' : 'Launch New Campaign'}</h2>
+                <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="col-span-full">
+                    <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Campaign Name</label>
+                    <input 
+                      type="text"
+                      required
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl p-4 font-bold outline-none focus:border-[#fb7701]"
+                      placeholder="e.g. Summer Flash Sale"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Start Time</label>
+                    <input 
+                      type="datetime-local"
+                      required
+                      value={formData.start_time}
+                      onChange={(e) => setFormData({...formData, start_time: e.target.value})}
+                      className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl p-4 font-bold outline-none focus:border-[#fb7701]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">End Time</label>
+                    <input 
+                      type="datetime-local"
+                      required
+                      value={formData.end_time}
+                      onChange={(e) => setFormData({...formData, end_time: e.target.value})}
+                      className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl p-4 font-bold outline-none focus:border-[#fb7701]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-400 block mb-4">Select Products & Set Prices</label>
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+                    {products.map(p => {
+                      const isSelected = formData.selected_products.find(sp => sp.product_id === p.id);
+                      return (
+                        <div key={p.id} className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all ${isSelected ? 'bg-orange-50 border-orange-100' : 'bg-gray-50 border-gray-100'}`}>
+                          <img src={p.images?.[0]?.url || 'https://via.placeholder.com/150'} alt="" className="w-12 h-12 rounded-xl object-cover" />
+                          <div className="flex-1">
+                            <p className="text-sm font-bold text-gray-900">{p.title}</p>
+                            <p className="text-xs text-gray-400 font-medium">Standard: ${p.price}</p>
+                          </div>
+                          {isSelected ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black text-orange-400">$</span>
+                              <input 
+                                type="number"
+                                step="0.01"
+                                value={isSelected.discounted_price}
+                                onChange={(e) => {
+                                  const newVal = parseFloat(e.target.value);
+                                  setFormData({
+                                    ...formData,
+                                    selected_products: formData.selected_products.map(sp => 
+                                      sp.product_id === p.id ? { ...sp, discounted_price: newVal } : sp
+                                    )
+                                  });
+                                }}
+                                className="w-20 bg-white border border-orange-200 rounded-lg p-2 text-xs font-bold outline-none"
+                              />
+                              <button 
+                                type="button"
+                                onClick={() => setFormData({
+                                  ...formData,
+                                  selected_products: formData.selected_products.filter(sp => sp.product_id !== p.id)
+                                })}
+                                className="p-1 text-red-400 hover:bg-red-50 rounded-lg"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button 
+                              type="button"
+                              onClick={() => setFormData({
+                                ...formData,
+                                selected_products: [...formData.selected_products, { product_id: p.id, discounted_price: p.price * 0.8 }]
+                              })}
+                              className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-black uppercase hover:border-[#fb7701] hover:text-[#fb7701] transition-all"
+                            >
+                              Add to Sale
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="pt-4">
+                  <button 
+                    type="submit"
+                    disabled={saving || formData.selected_products.length === 0}
+                    className="w-full bg-[#fb7701] text-white py-4 rounded-2xl font-bold hover:bg-[#e06a01] transition-all shadow-xl shadow-orange-100 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {saving ? 'Processing...' : editingCampaign ? 'Save Changes' : 'Launch Campaign'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <ConfirmModal 
+        isOpen={confirmDelete.isOpen}
+        onClose={() => setConfirmDelete({ isOpen: false, id: null })}
+        onConfirm={handleDelete}
+        title="Delete Campaign?"
+        message="Are you sure you want to remove this marketing event? This will stop all associated product discounts immediately."
+        confirmText="Delete Campaign"
+        type="danger"
+      />
     </div>
   );
 };

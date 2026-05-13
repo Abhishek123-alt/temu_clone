@@ -94,6 +94,10 @@ const SellerDashboard = () => {
   const [imageUploading, setImageUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [processingIds, setProcessingIds] = useState(new Set());
+  const [timeRange, setTimeRange] = useState('7d'); // '7d', '1m', '3m', '6m', '1y', 'custom'
+  const [customRange, setCustomRange] = useState({ start: '', end: '' });
+  const [customerFilter, setCustomerFilter] = useState('All Customers');
+  const [selectedDetail, setSelectedDetail] = useState(null);
 
   // Custom Confirm State
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, productId: null });
@@ -237,31 +241,102 @@ const SellerDashboard = () => {
     }
   };
 
-  const getWeeklySales = () => {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const salesMap = days.reduce((acc, day) => ({ ...acc, [day]: 0 }), {});
-    
+  const getSalesData = () => {
     const now = new Date();
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(now.getDate() - 7);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
+    let startDate = new Date();
+    let grouping = 'day';
 
-    orders.forEach(order => {
-      const date = new Date(order.created_at);
-      if (date >= sevenDaysAgo) {
-        const dayName = days[date.getDay()];
-        salesMap[dayName] += order.total_amount;
-      }
-    });
-    
-    const todayIdx = now.getDay();
-    const sorted = [];
-    for (let i = 0; i < 7; i++) {
-      const idx = (todayIdx - 6 + i + 7) % 7;
-      const dayName = days[idx];
-      sorted.push({ day: dayName, sales: salesMap[dayName] });
+    switch (timeRange) {
+      case '1m':
+        startDate.setMonth(now.getMonth() - 1);
+        grouping = 'day';
+        break;
+      case '3m':
+        startDate.setMonth(now.getMonth() - 3);
+        grouping = 'week';
+        break;
+      case '6m':
+        startDate.setMonth(now.getMonth() - 6);
+        grouping = 'week';
+        break;
+      case '1y':
+        startDate.setFullYear(now.getFullYear() - 1);
+        grouping = 'month';
+        break;
+      case 'custom':
+        if (customRange.start) startDate = new Date(customRange.start);
+        grouping = 'day';
+        break;
+      default: // 7d
+        startDate.setDate(now.getDate() - 7);
+        grouping = 'day';
     }
-    return sorted;
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = timeRange === 'custom' && customRange.end ? new Date(customRange.end) : now;
+    endDate.setHours(23, 59, 59, 999);
+
+    if (timeRange === 'custom' && startDate > endDate) {
+      return []; // Invalid range
+    }
+
+    const filteredOrders = orders.filter(o => {
+      const d = new Date(o.created_at);
+      return d >= startDate && d <= endDate;
+    });
+
+    if (grouping === 'day') {
+      const data = [];
+      const curr = new Date(startDate);
+      while (curr <= endDate) {
+        const label = curr.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const sales = filteredOrders.filter(o => new Date(o.created_at).toDateString() === curr.toDateString())
+          .reduce((sum, o) => sum + o.total_amount, 0);
+        data.push({ label, sales });
+        curr.setDate(curr.getDate() + 1);
+      }
+      return data;
+    }
+
+    if (grouping === 'month') {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const data = [];
+      const curr = new Date(startDate);
+      while (curr <= endDate) {
+        const m = curr.getMonth();
+        const y = curr.getFullYear();
+        const label = `${months[m]} ${y}`;
+        const sales = filteredOrders.filter(o => {
+          const d = new Date(o.created_at);
+          return d.getMonth() === m && d.getFullYear() === y;
+        }).reduce((sum, o) => sum + o.total_amount, 0);
+        data.push({ label, sales });
+        curr.setMonth(curr.getMonth() + 1);
+      }
+      return data;
+    }
+
+    if (grouping === 'week') {
+      const data = [];
+      const curr = new Date(startDate);
+      while (curr <= endDate) {
+        const startOfWeek = new Date(curr);
+        const endOfWeek = new Date(curr);
+        endOfWeek.setDate(curr.getDate() + 6);
+        
+        const label = `Wk ${Math.ceil(curr.getDate() / 7)} ${curr.toLocaleDateString(undefined, { month: 'short' })}`;
+        const sales = filteredOrders.filter(o => {
+          const d = new Date(o.created_at);
+          return d >= startOfWeek && d <= endOfWeek;
+        }).reduce((sum, o) => sum + o.total_amount, 0);
+        
+        data.push({ label, sales });
+        curr.setDate(curr.getDate() + 7);
+      }
+      return data;
+    }
+
+    return [];
   };
 
   const totalRevenue = orders.reduce((sum, o) => sum + o.total_amount, 0);
@@ -331,7 +406,58 @@ const SellerDashboard = () => {
           transition={{ delay: 0.4 }}
           className="lg:col-span-2"
         >
-          <SalesChart data={getWeeklySales()} />
+          <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden group h-full">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Revenue Analysis</h3>
+                <p className="text-sm text-gray-400 font-medium">Sales performance over time</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {['7d', '1m', '3m', '6m', '1y', 'custom'].map(range => (
+                  <button
+                    key={range}
+                    onClick={() => setTimeRange(range)}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                      timeRange === range ? 'bg-[#fb7701] text-white shadow-lg shadow-orange-100' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                    }`}
+                  >
+                    {range === '1y' ? 'Year' : range === '1m' ? 'Month' : range}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {timeRange === 'custom' && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-4 mb-6 p-4 bg-orange-50 rounded-2xl border border-orange-100"
+              >
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black uppercase text-orange-400">Start Date</label>
+                  <input 
+                    type="date" 
+                    value={customRange.start}
+                    onChange={(e) => setCustomRange({...customRange, start: e.target.value})}
+                    className="bg-transparent text-sm font-bold text-orange-900 outline-none"
+                  />
+                </div>
+                <div className="text-orange-200">→</div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black uppercase text-orange-400">End Date</label>
+                  <input 
+                    type="date" 
+                    value={customRange.end}
+                    min={customRange.start}
+                    onChange={(e) => setCustomRange({...customRange, end: e.target.value})}
+                    className="bg-transparent text-sm font-bold text-orange-900 outline-none"
+                  />
+                </div>
+              </motion.div>
+            )}
+
+            <SalesChart data={getSalesData()} />
+          </div>
         </motion.div>
         <div className="space-y-6">
           <motion.div 
@@ -463,21 +589,48 @@ const SellerDashboard = () => {
         )}
         
         {activeTab === 'returns' && (
-          <table className="w-full text-left">
+          <div>
+            <div className="px-8 py-4 border-b border-gray-50 bg-gray-50/30 flex justify-between items-center">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Return Requests</p>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-black uppercase text-gray-400">Customer:</span>
+                <select 
+                  value={customerFilter}
+                  onChange={(e) => setCustomerFilter(e.target.value)}
+                  className="bg-white border border-gray-200 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase outline-none"
+                >
+                  <option>All Customers</option>
+                  {Array.from(new Set(returns.map(r => r.customer_name))).map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <table className="w-full text-left">
             <thead>
               <tr className="bg-gray-50/50 text-[10px] font-black uppercase tracking-widest text-gray-400">
                 <th className="px-8 py-6">Order / Item</th>
+                <th className="px-8 py-6">Customer</th>
                 <th className="px-8 py-6">Reason</th>
                 <th className="px-8 py-6">Status</th>
                 <th className="px-8 py-6 text-right">Decision</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {returns.map((ret) => (
+              {returns.filter(r => customerFilter === 'All Customers' || r.customer_name === customerFilter).map((ret) => (
                 <tr key={ret.id} className="hover:bg-gray-50/30 transition-colors">
                   <td className="px-8 py-6">
-                    <p className="font-bold text-gray-900 text-sm">Order #{ret.order?.id?.slice(0, 8) || ret.order_id?.slice(0, 8)}</p>
+                    <div className="flex flex-col">
+                      <p className="font-bold text-gray-900 text-sm">Order #{ret.order?.id?.slice(0, 8) || ret.order_id?.slice(0, 8)}</p>
+                      <button 
+                        onClick={() => setSelectedDetail({ type: 'return', data: ret })}
+                        className="text-[10px] font-black text-[#fb7701] uppercase hover:underline text-left"
+                      >
+                        View Details
+                      </button>
+                    </div>
                   </td>
+                  <td className="px-8 py-6 font-bold text-gray-900">{ret.customer_name}</td>
                   <td className="px-8 py-6">
                     <span className="text-sm font-medium text-gray-700 bg-gray-100 px-3 py-1.5 rounded-xl capitalize">
                       {ret.reason.replace('_', ' ')}
@@ -524,24 +677,52 @@ const SellerDashboard = () => {
               )}
             </tbody>
           </table>
+          </div>
         )}
 
         {activeTab === 'orders' && (
-          <table className="w-full text-left">
+          <div>
+            <div className="px-8 py-4 border-b border-gray-50 bg-gray-50/30 flex justify-between items-center">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Merchant Orders</p>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-black uppercase text-gray-400">Customer:</span>
+                <select 
+                  value={customerFilter}
+                  onChange={(e) => setCustomerFilter(e.target.value)}
+                  className="bg-white border border-gray-200 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase outline-none"
+                >
+                  <option>All Customers</option>
+                  {Array.from(new Set(orders.map(o => o.customer_name))).map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <table className="w-full text-left">
             <thead>
               <tr className="bg-gray-50/50 text-[10px] font-black uppercase tracking-widest text-gray-400">
                 <th className="px-8 py-6">Order ID</th>
+                <th className="px-8 py-6">Customer</th>
                 <th className="px-8 py-6">Date</th>
                 <th className="px-8 py-6">Status</th>
                 <th className="px-8 py-6 text-right">Total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {orders.map((order) => (
+              {orders.filter(o => customerFilter === 'All Customers' || o.customer_name === customerFilter).map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50/30 transition-colors">
                   <td className="px-8 py-6">
-                    <p className="font-bold text-gray-900 text-sm">#{order.id.slice(0, 8)}</p>
+                    <div className="flex flex-col">
+                      <p className="font-bold text-gray-900 text-sm">#{order.id.slice(0, 8)}</p>
+                      <button 
+                        onClick={() => setSelectedDetail({ type: 'order', data: order })}
+                        className="text-[10px] font-black text-[#fb7701] uppercase hover:underline text-left"
+                      >
+                        View Details
+                      </button>
+                    </div>
                   </td>
+                  <td className="px-8 py-6 font-bold text-gray-900">{order.customer_name}</td>
                   <td className="px-8 py-6 text-gray-500 font-medium">
                     {new Date(order.created_at).toLocaleDateString()}
                   </td>
@@ -582,6 +763,7 @@ const SellerDashboard = () => {
               )}
             </tbody>
           </table>
+          </div>
         )}
 
         {activeTab === 'payments' && (
@@ -795,7 +977,6 @@ const SellerDashboard = () => {
                     <option value="Aramex">Aramex</option>
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Tracking Number</label>
                   <input 
@@ -804,20 +985,108 @@ const SellerDashboard = () => {
                     value={shipFormData.tracking_number}
                     onChange={(e) => setShipFormData({...shipFormData, tracking_number: e.target.value})}
                     className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-[#fb7701] outline-none font-bold"
-                    placeholder="e.g. 1234567890"
+                    placeholder="e.g. 123456789"
                   />
                 </div>
 
-                <div className="pt-4">
+                <div className="pt-6 flex gap-4">
                   <button 
                     type="submit"
                     disabled={saving}
-                    className="w-full bg-[#fb7701] text-white py-4 rounded-2xl font-bold hover:bg-[#e06a01] transition-all shadow-xl shadow-orange-100 disabled:opacity-70 flex items-center justify-center gap-2"
+                    className="flex-1 bg-[#fb7701] text-white py-4 rounded-2xl font-bold hover:bg-[#e06a01] transition-all shadow-xl shadow-orange-100 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Confirm Shipment
+                    {saving ? 'Processing...' : 'Confirm Shipment'}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setIsShipModalOpen(false)}
+                    className="px-8 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold hover:bg-gray-200 transition-all"
+                  >
+                    Cancel
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Details Modal */}
+      <AnimatePresence>
+        {selectedDetail && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedDetail(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white rounded-[40px] shadow-2xl p-10 w-full max-w-2xl overflow-hidden"
+            >
+              <div className="flex justify-between items-start mb-8">
+                <div>
+                  <h2 className="text-2xl font-black text-gray-900">
+                    {selectedDetail.type === 'order' ? 'Order Details' : 'Return Request Details'}
+                  </h2>
+                  <p className="text-[10px] font-black uppercase text-gray-400 mt-1">ID: {selectedDetail.data.id}</p>
+                </div>
+                <button onClick={() => setSelectedDetail(null)} className="p-2 hover:bg-gray-100 rounded-full transition-all">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8 mb-8">
+                <div className="p-6 bg-gray-50 rounded-3xl">
+                  <p className="text-[10px] font-black uppercase text-gray-400 mb-2">Customer Information</p>
+                  <p className="text-lg font-black text-gray-900">{selectedDetail.data.customer_name}</p>
+                  <p className="text-xs text-gray-500 font-medium mt-1">
+                    {selectedDetail.type === 'order' ? selectedDetail.data.shipping_address : 'Standard Return'}
+                  </p>
+                </div>
+                <div className="p-6 bg-gray-50 rounded-3xl">
+                  <p className="text-[10px] font-black uppercase text-gray-400 mb-2">Status & Value</p>
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg font-black text-gray-900">
+                      ${(selectedDetail.data.total_amount || selectedDetail.data.refund_amount || 0).toFixed(2)}
+                    </span>
+                    <span className="text-[10px] font-black uppercase bg-orange-100 text-orange-600 px-2 py-0.5 rounded-md">
+                      {selectedDetail.data.status}
+                    </span>
+                  </div>
+                  {selectedDetail.type === 'return' && (
+                    <p className="text-[10px] font-bold text-gray-500 mt-2 italic">Reason: {selectedDetail.data.reason}</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black uppercase text-gray-400 mb-4">Items</p>
+                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                  {(selectedDetail.type === 'order' ? selectedDetail.data.items : selectedDetail.data.items?.map(i => i.order_item) || []).map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                      <img src={item.product_image || 'https://via.placeholder.com/150'} alt="" className="w-14 h-14 rounded-xl object-cover" />
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-gray-900 line-clamp-1">{item.product_title}</p>
+                        <p className="text-[10px] text-gray-400 font-black uppercase">Qty: {item.quantity} × ${item.price.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-8 flex justify-end">
+                <button 
+                  onClick={() => setSelectedDetail(null)}
+                  className="bg-gray-900 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all"
+                >
+                  Close View
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

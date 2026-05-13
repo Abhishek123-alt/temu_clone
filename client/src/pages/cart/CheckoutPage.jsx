@@ -129,36 +129,23 @@ const CheckoutPage = () => {
     }
 
     setLoading(true);
-    try {
-      // 1. Create order in backend
-      const response = await api.post('/orders/', {
-        shipping_address: address,
-        total_amount: total,
-        reward_id: selectedReward ? selectedReward.id : undefined,
-        payment_method_id: selectedPaymentMethod.type === 'upi' ? undefined : selectedPaymentMethod.id
-      });
-
-      // 2. Clear frontend cart (local state only, backend is already cleared by order service)
-      clearCart();
-
-      // 3. Refresh User Data to remove the used coupon from state
-      const userRes = await api.get('/user/me');
-      setUser(userRes.data);
-
-      // 4. Go to Payment
+    // Instead of creating the order now, we navigate to payment with the order details.
+    // The order will be created ONLY after successful payment.
+    setTimeout(() => {
+      setLoading(false);
       navigate('/payment', { 
         state: { 
-          orderId: response.data.id, 
           amount: total,
-          paymentMethod: selectedPaymentMethod
+          paymentMethod: selectedPaymentMethod,
+          checkoutDetails: {
+            shipping_address: address,
+            total_amount: total,
+            reward_id: selectedReward ? selectedReward.id : undefined,
+            payment_method_id: selectedPaymentMethod.type === 'upi' ? undefined : selectedPaymentMethod.id
+          }
         } 
       });
-    } catch (error) {
-      console.error("Order failed:", error);
-      toast.error("Checkout failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    }, 800);
   };
 
   if (items.length === 0) {

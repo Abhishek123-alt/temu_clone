@@ -16,6 +16,8 @@ This document outlines the core RESTful API endpoints for the Temu clone, built 
 | `/products` | GET | List products (with pagination/filters) |
 | `/products/recommendations` | GET | AI-driven personalized product feed |
 | `/products/{id}` | GET | Get detailed product information |
+| `/products/me` | GET | (Seller) List products owned by the current seller |
+| `/products/upload` | POST | Upload product images |
 | `/categories` | GET | Get category tree |
 | `/search` | GET | Search products with query params |
 
@@ -33,6 +35,11 @@ This document outlines the core RESTful API endpoints for the Temu clone, built 
 | `/orders` | POST | Place a new order |
 | `/orders` | GET | List user's order history |
 | `/orders/{id}` | GET | Get specific order details/tracking |
+| `/orders/seller/orders` | GET | (Seller) List orders for the current seller's products |
+| `/orders/seller/returns` | GET | (Seller) List return requests for current seller |
+| `/orders/{id}/shipments` | POST | (Seller) Add shipping details (carrier, tracking) |
+| `/orders/{id}/status` | PUT | Update order status (e.g., 'shipped') |
+| `/orders/returns/{id}/process` | POST | (Seller) Approve or Reject a return request |
 | `/checkout/preview` | POST | Calculate totals/taxes/coupons before payment |
 
 ## 💰 Payments
@@ -56,3 +63,9 @@ This document outlines the core RESTful API endpoints for the Temu clone, built 
 | `/user/addresses` | GET/POST | Manage shipping addresses |
 | `/user/coupons` | GET | List available and used coupons |
 | `/user/wishlist` | GET/POST | Manage saved items |
+
+## 🛠 Administration (Implemented)
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/admin/stats` | GET | Get global platform statistics (users, products, sales) |
+| `/admin/users` | GET | List all users in the system |

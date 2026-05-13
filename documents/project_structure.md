@@ -21,9 +21,13 @@ client/
 │   │   ├── common/         # Buttons, Inputs, Modals
 │   │   ├── layout/         # Navbar, Footer, Sidebar
 │   │   ├── product/        # Product Cards, Grid, Reviews
+│   │   ├── seller/         # Seller-specific components (SalesChart)
 │   │   └── games/          # Spin-the-wheel, Mini-game components
 │   ├── hooks/              # Custom React hooks (useAuth, useCart)
-│   ├── pages/              # Page components (Home, PDP, Cart, Checkout)
+│   ├── pages/              # Page components
+│   │   ├── admin/          # Admin Panel (Dashboard, User Management)
+│   │   ├── seller/         # Seller Portal (Dashboard, Inventory)
+│   │   └── ...             # Home, PDP, Cart, Checkout
 │   ├── services/           # API call logic (Axios/Fetch)
 │   ├── store/              # State management (Zustand or Redux)
 │   ├── utils/              # Helper functions, constants

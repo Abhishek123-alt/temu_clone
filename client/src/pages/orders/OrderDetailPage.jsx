@@ -47,7 +47,7 @@ const OrderDetailPage = () => {
       fetchOrder(); 
     } catch (error) {
       console.error("Return failed:", error);
-      alert("Failed to request return. Please try again.");
+      alert(error.response?.data?.detail || "Failed to request return. Please try again.");
     }
   };
 
@@ -228,15 +228,17 @@ const OrderDetailPage = () => {
                     <div className="text-right">
                       <p className="font-black text-gray-900 text-lg">${(item.price * item.quantity).toFixed(2)}</p>
                         <div className="flex flex-col gap-2 mt-2">
-                          <button
-                             onClick={() => {
-                               setReturnItems([item.id]);
-                               setShowReturnModal(true);
-                             }}
-                             className="bg-white border-2 border-gray-100 text-gray-700 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white hover:border-gray-900 transition-all active:scale-95 shadow-sm"
-                           >
-                             Return Item
-                           </button>
+                           {order.status === 'delivered' && (
+                             <button
+                               onClick={() => {
+                                 setReturnItems([item.id]);
+                                 setShowReturnModal(true);
+                               }}
+                               className="bg-white border-2 border-gray-100 text-gray-700 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white hover:border-gray-900 transition-all active:scale-95 shadow-sm"
+                             >
+                               Return Item
+                             </button>
+                           )}
                            <button
                              onClick={() => {
                                setReviewProductId(item.product_id);
