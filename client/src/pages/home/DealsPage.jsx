@@ -4,6 +4,7 @@ import { productService } from '../../services/productService';
 import ProductCard from '../../components/products/ProductCard';
 import { Zap, Timer } from 'lucide-react';
 import api from '../../services/api';
+import CategoryRail from '../../components/products/CategoryRail';
 
 const DealsPage = () => {
   const [products, setProducts] = useState([]);
@@ -100,8 +101,14 @@ const DealsPage = () => {
         </div>
       )}
 
+      {/* Category Rail */}
+      <CategoryRail 
+        categories={categories} 
+        activeCategoryId={activeCategoryId} 
+      />
+
       {/* Product Feed */}
-      <div className="mb-8 flex items-center justify-between">
+      <div id="product-feed" className="mb-8 flex items-center justify-between scroll-mt-40">
         <h2 className="text-2xl font-extrabold text-gray-900">
           {currentSale ? 'Event Items' : 'All Current Deals'}
         </h2>

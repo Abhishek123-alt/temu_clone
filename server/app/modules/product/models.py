@@ -34,6 +34,7 @@ class Product(Base):
     stock = Column(Integer, default=0) # Keep for total stock sum or compatibility
     rating = Column(Float, default=0.0)
     review_count = Column(Integer, default=0)
+    sales_count = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
     seller_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)

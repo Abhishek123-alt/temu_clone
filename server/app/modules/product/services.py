@@ -6,7 +6,7 @@ from typing import List
 import uuid
 import re
 
-def get_products(db: Session, skip: int = 0, limit: int = 20, search: str = None, deal_only: bool = False, normal_only: bool = False, category_id: str = None, new_arrivals: bool = False):
+def get_products(db: Session, skip: int = 0, limit: int = 20, search: str = None, deal_only: bool = False, normal_only: bool = False, category_id: str = None, new_arrivals: bool = False, sort_by: str = None):
     query = db.query(Product)
 
     if deal_only:
@@ -23,20 +23,31 @@ def get_products(db: Session, skip: int = 0, limit: int = 20, search: str = None
         query_vector = generate_embedding(search)
         if query_vector:
             query = query.filter(
-                (Product.embedding.cosine_distance(query_vector) < 0.8) |
+                (Product.embedding.cosine_distance(query_vector) < 0.4) |
                 (Product.title.ilike(f"%{search}%")) |
                 (Product.description.ilike(f"%{search}%"))
             )
-            query = query.order_by(Product.embedding.cosine_distance(query_vector))
+            # Default order for search is relevance if not specified
+            if not sort_by:
+                query = query.order_by(Product.embedding.cosine_distance(query_vector))
         else:
             query = query.filter(
                 (Product.title.ilike(f"%{search}%")) |
                 (Product.description.ilike(f"%{search}%"))
             )
-    elif new_arrivals:
-        query = query.order_by(Product.created_at.desc())
-    else:
-        query = query.order_by(Product.updated_at.desc())
+
+    # Handle explicit sorting
+    if sort_by == "price_asc":
+        query = query.order_by(Product.price.asc())
+    elif sort_by == "price_desc":
+        query = query.order_by(Product.price.desc())
+    elif sort_by == "top_sales":
+        query = query.order_by(Product.sales_count.desc())
+    elif not search:
+        if new_arrivals:
+            query = query.order_by(Product.created_at.desc())
+        else:
+            query = query.order_by(Product.updated_at.desc())
 
     return query.offset(skip).limit(limit).all()
 

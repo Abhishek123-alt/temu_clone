@@ -4,27 +4,36 @@ import { productService } from '../../services/productService';
 import ProductCard from '../../components/products/ProductCard';
 import { Sparkles, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
+import CategoryRail from '../../components/products/CategoryRail';
 
 const NewArrivalsPage = () => {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const activeCategoryId = queryParams.get('category_id');
 
   useEffect(() => {
-    const fetchNewArrivals = async () => {
+    const fetchInitialData = async () => {
       setLoading(true);
       try {
-        // Fetch products sorted by new arrivals
-        const data = await productService.getProducts(0, 50, '', false, true, null, true);
-        setProducts(data);
+        const category_id = queryParams.get('category_id');
+        const [productsData, categoriesData] = await Promise.all([
+          productService.getProducts(0, 50, '', false, true, category_id, true),
+          productService.getCategories()
+        ]);
+        setProducts(productsData);
+        setCategories(categoriesData);
       } catch (error) {
-        console.error('Failed to fetch new arrivals:', error);
+        console.error('Failed to fetch initial data:', error);
       } finally {
         setLoading(false);
       }
     };
-    fetchNewArrivals();
-  }, []);
+    fetchInitialData();
+  }, [location.search]);
 
   if (loading) {
     return (
@@ -79,8 +88,14 @@ const NewArrivalsPage = () => {
           <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-blue-400/20 rounded-full blur-3xl" />
         </div>
 
+        {/* Category Rail */}
+        <CategoryRail 
+          categories={categories} 
+          activeCategoryId={activeCategoryId} 
+        />
+
         {/* Product Grid */}
-        <div className="space-y-12">
+        <div id="product-feed" className="space-y-12 scroll-mt-40">
           <div className="flex items-center justify-between">
             <h2 className="text-3xl font-black text-gray-900 tracking-tight">Fresh Drops</h2>
             <div className="text-sm font-bold text-gray-400 bg-white px-4 py-2 rounded-full shadow-sm border border-gray-100">
