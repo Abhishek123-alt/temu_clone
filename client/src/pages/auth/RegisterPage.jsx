@@ -9,6 +9,7 @@ const RegisterPage = () => {
     password: '',
     full_name: '',
     phone: '',
+    referral_code: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -80,6 +81,20 @@ const RegisterPage = () => {
               />
             </div>
           </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Referral Code (Optional)</label>
+            <input
+              name="referral_code"
+              type="text"
+              className="input-field"
+              placeholder="Enter code from a friend"
+              value={formData.referral_code}
+              onChange={handleChange}
+              maxLength={8}
+            />
+          </div>
+
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Email Address</label>
             <input

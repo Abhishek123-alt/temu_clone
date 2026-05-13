@@ -15,7 +15,7 @@ def get_cart(db: Session = Depends(get_db), current_user: User = Depends(get_cur
 @router.post("/items", response_model=schemas.CartItemResponse)
 def add_item(item_in: schemas.CartItemBase, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     cart = services.get_or_create_cart(db, user_id=current_user.id)
-    return services.add_item_to_cart(db, cart_id=cart.id, product_id=item_in.product_id, quantity=item_in.quantity)
+    return services.add_item_to_cart(db, cart_id=cart.id, product_id=item_in.product_id, variant_id=item_in.variant_id, quantity=item_in.quantity)
 
 @router.put("/items/{product_id}", response_model=schemas.CartItemResponse)
 def update_item(product_id: str, item_in: schemas.CartItemUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):

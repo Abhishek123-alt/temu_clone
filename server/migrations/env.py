@@ -19,10 +19,12 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 from app.db.session import Base
-from app.modules.user.models import User, Address
+from app.modules.user.models import User, Address, Reward, PaymentMethod
 from app.modules.product.models import Category, Product, ProductImage
 from app.modules.cart.models import Cart, CartItem
-from app.modules.order.models import Order, OrderItem
+from app.modules.order.models import Order, OrderItem, OrderEvent, Shipment, Return, ReturnItem, Outbox
+from app.modules.quest.models import Quest, UserQuestProgress
+from app.modules.flash_sale.models import FlashSale, FlashSaleProduct
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

@@ -5,31 +5,41 @@ import ProductCard from '../../components/products/ProductCard';
 import { motion } from 'framer-motion';
 import { Gift, Zap, Star, Sparkles } from 'lucide-react';
 import SpinWheel from '../../components/gamification/SpinWheel';
+import MarketingCarousel from '../../components/marketing/MarketingCarousel';
+import FlashSaleSection from '../../components/marketing/FlashSaleSection';
 
 const HomePage = () => {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isWheelOpen, setIsWheelOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const queryParams = new URLSearchParams(location.search);
+  const activeCategoryId = queryParams.get('category_id');
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchInitialData = async () => {
       setLoading(true);
       try {
-        const queryParams = new URLSearchParams(location.search);
         const search = queryParams.get('search') || '';
         const category_id = queryParams.get('category_id');
-        // Fetch normal products only (no discounts) for the homepage, filtered by category
-        const data = await productService.getProducts(0, 50, search, false, true, category_id);
-        setProducts(data);
+        const new_arrivals = queryParams.get('new_arrivals') === 'true';
+        
+        const [productsData, categoriesData] = await Promise.all([
+          productService.getProducts(0, 50, search, false, true, category_id, new_arrivals),
+          productService.getCategories()
+        ]);
+        
+        setProducts(productsData);
+        setCategories(categoriesData);
       } catch (error) {
-        console.error('Failed to fetch products:', error);
+        console.error('Failed to fetch data:', error);
       } finally {
         setLoading(false);
       }
     };
-    fetchProducts();
+    fetchInitialData();
   }, [location.search]);
 
   if (loading && products.length === 0) {
@@ -42,27 +52,18 @@ const HomePage = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Banner/Hero placeholder */}
-      <div className="bg-orange-50 rounded-[32px] p-8 md:p-16 mb-8 text-center md:text-left relative overflow-hidden">
-        <div className="relative z-10">
-          <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight">
-            Shop like a <br /><span className="text-[#fb7701]">Billionaire</span>
-          </h1>
-          <p className="text-gray-600 mt-4 text-lg font-medium max-w-md">
-            Unbeatable prices on millions of quality items. Free shipping on all orders.
-          </p>
-          <button 
-            onClick={() => navigate('/deals')}
-            className="btn-primary mt-8 py-4 px-10 text-xl"
-          >
-            Explore Deals
-          </button>
-        </div>
-        <div className="absolute top-0 right-0 w-1/3 h-full bg-orange-100 hidden md:block rounded-l-full transform translate-x-12"></div>
+      {/* Dynamic Marketing Hero */}
+      <div className="mb-12">
+        <MarketingCarousel />
       </div>
 
+      {/* Flash Sale Section */}
+      <FlashSaleSection />
+
       <div id="product-feed" className="mb-8 flex items-center justify-between scroll-mt-24">
-        <h2 className="text-2xl font-extrabold text-gray-900">Recommended for You</h2>
+        <h2 className="text-2xl font-extrabold text-gray-900">
+          {queryParams.get('new_arrivals') === 'true' ? 'New Arrivals' : 'Recommended for You'}
+        </h2>
         <a href="#" className="text-[#fb7701] font-bold hover:underline">View All</a>
       </div>
 
@@ -75,7 +76,7 @@ const HomePage = () => {
       {products.length === 0 && (
         <div className="text-center py-20">
           <p className="text-xl font-bold text-gray-400">No products found matching your search.</p>
-          <button 
+          <button
             onClick={() => navigate('/')}
             className="text-[#fb7701] font-bold mt-4 hover:underline"
           >

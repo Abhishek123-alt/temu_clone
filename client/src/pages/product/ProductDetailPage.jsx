@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { productService } from '../../services/productService';
+import { userService } from '../../services/userService';
 import { useCartStore } from '../../store/cartStore';
-import { Star, ShoppingCart, ShieldCheck, Truck, RotateCcw, Plus, Minus, Check } from 'lucide-react';
+import { useWishlistStore } from '../../store/wishlistStore';
+import { Star, ShoppingCart, ShieldCheck, Truck, RotateCcw, Plus, Minus, Check, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
+import ReviewList from '../../components/reviews/ReviewList';
 
 const ProductDetailPage = () => {
   const { slug } = useParams();
@@ -12,13 +15,30 @@ const ProductDetailPage = () => {
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [selectedOptions, setSelectedOptions] = useState({});
   const { addToCart } = useCartStore();
+  const { toggleWishlist, isInWishlist } = useWishlistStore();
 
   useEffect(() => {
     const fetchProduct = async () => {
       try {
         const data = await productService.getProductBySlug(slug);
         setProduct(data);
+
+        // Initialize selected options if product has variants
+        if (data.variants && data.variants.length > 0) {
+          const firstVariant = data.variants[0];
+          const initialOptions = {};
+          firstVariant.option_values.forEach(ov => {
+            const option = data.options.find(o =>
+              o.values.some(v => v.id === ov.id)
+            );
+            if (option) initialOptions[option.name] = ov.value;
+          });
+          setSelectedOptions(initialOptions);
+        }
+
+        userService.addToRecentlyViewed(data.id).catch(err => console.error("Failed to record view", err));
       } catch (error) {
         console.error('Failed to fetch product:', error);
       } finally {
@@ -28,10 +48,37 @@ const ProductDetailPage = () => {
     fetchProduct();
   }, [slug]);
 
+  const handleOptionSelect = (optionName, value) => {
+    setSelectedOptions(prev => ({
+      ...prev,
+      [optionName]: value
+    }));
+  };
+
+  if (loading) return <div className="p-20 text-center text-gray-400">Loading details...</div>;
+  if (!product) return <div className="p-20 text-center">Product not found</div>;
+
+  const currentVariant = product.variants && product.variants.length > 0 
+    ? product.variants.find(v =>
+        v.option_values.every(ov =>
+          Object.entries(selectedOptions).some(([name, val]) =>
+            product.options.find(opt => opt.name === name && opt.values.some(ov_val => ov_val.id === ov.id && ov_val.value === val))
+          )
+        )
+      ) || product.variants[0]
+    : null;
+
+  const displayPrice = currentVariant?.price ?? product.price;
+  const displayOriginalPrice = currentVariant?.original_price ?? product.original_price;
+
   const handleAddToCart = async () => {
+    if (product.variants && product.variants.length > 0 && !currentVariant) {
+      alert("Please select a product variation");
+      return;
+    }
     setAdding(true);
     try {
-      await addToCart(product.id, quantity);
+      await addToCart(product.id, currentVariant?.id, quantity);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (error) {
@@ -41,14 +88,11 @@ const ProductDetailPage = () => {
     }
   };
 
-  if (loading) return <div className="p-20 text-center text-gray-400">Loading details...</div>;
-  if (!product) return <div className="p-20 text-center">Product not found</div>;
-
   const mainImage = product.images.find(img => img.is_main)?.url || product.images[0]?.url;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-20">
         
         {/* Left: Images */}
         <div className="space-y-4">
@@ -88,13 +132,38 @@ const ProductDetailPage = () => {
 
           <div className="bg-gray-50 rounded-[32px] p-8 mb-8">
             <div className="flex items-baseline gap-4 mb-2">
-              <span className="text-5xl font-black text-[#fb7701]">${product.price}</span>
-              {product.original_price && (
-                <span className="text-xl text-gray-400 line-through">${product.original_price}</span>
+              <span className="text-5xl font-black text-[#fb7701]">${displayPrice}</span>
+              {displayOriginalPrice && (
+                <span className="text-xl text-gray-400 line-through">${displayOriginalPrice}</span>
               )}
             </div>
-            <p className="text-green-600 font-bold text-sm">Save ${(product.original_price - product.price).toFixed(2)} today!</p>
+            <p className="text-green-600 font-bold text-sm">Save ${(displayOriginalPrice - displayPrice || 0).toFixed(2)} today!</p>
           </div>
+
+          {product.options && product.options.length > 0 && (
+            <div className="space-y-8 mb-10">
+              {product.options.map((option) => (
+                <div key={option.id} className="space-y-3">
+                  <label className="text-sm font-bold text-gray-900 uppercase tracking-wider">{option.name}</label>
+                  <div className="flex flex-wrap gap-3">
+                    {option.values.map((val) => (
+                      <button
+                        key={val.id}
+                        onClick={() => handleOptionSelect(option.name, val.value)}
+                        className={`px-6 py-3 rounded-full text-sm font-bold transition-all border-2 ${
+                          selectedOptions[option.name] === val.value
+                            ? 'bg-white border-[#fb7701] text-[#fb7701] shadow-sm'
+                            : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200'
+                        }`}
+                      >
+                        {val.value}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <p className="text-gray-600 leading-relaxed mb-10 text-lg">{product.description}</p>
 
@@ -131,6 +200,17 @@ const ProductDetailPage = () => {
                 <><ShoppingCart size={24} /> Add to Cart</>
               )}
             </button>
+
+            <button 
+              onClick={() => toggleWishlist(product)}
+              className={`p-5 border-2 rounded-full transition-all ${
+                isInWishlist(product.id) 
+                ? 'bg-red-50 border-red-200 text-red-500 shadow-sm' 
+                : 'border-gray-100 text-gray-400 hover:bg-red-50 hover:border-red-100 hover:text-red-500'
+              }`}
+            >
+              <Heart size={28} fill={isInWishlist(product.id) ? "currentColor" : "none"} />
+            </button>
           </div>
 
           {/* Features */}
@@ -148,8 +228,12 @@ const ProductDetailPage = () => {
               <span className="text-sm font-bold">Secure Payment</span>
             </div>
           </div>
-
         </div>
+      </div>
+
+      {/* Reviews Section - Outside the grid for full width */}
+      <div className="pt-16 border-t border-gray-100">
+        <ReviewList productId={product.id} />
       </div>
     </div>
   );
