@@ -92,7 +92,7 @@ class VariantOptionValue(Base):
     variant_id = Column(UUID(as_uuid=True), ForeignKey("product_variants.id"), primary_key=True)
     option_value_id = Column(UUID(as_uuid=True), ForeignKey("product_option_values.id"), primary_key=True)
 
-    option_value = relationship("ProductOptionValue")
+    option_value = relationship("ProductOptionValue", overlaps="option_values")
 
 
 class ProductImage(Base):

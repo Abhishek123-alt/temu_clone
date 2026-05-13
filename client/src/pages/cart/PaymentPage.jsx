@@ -4,11 +4,15 @@ import { motion } from 'framer-motion';
 import { Smartphone, ShieldCheck, CheckCircle2, ArrowLeft, CreditCard } from 'lucide-react';
 import api from '../../services/api';
 import { toast } from '../../utils/toast';
+import { useCartStore } from '../../store/cartStore';
+import { useAuthStore } from '../../store/authStore';
 
 const PaymentPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { orderId, amount, paymentMethod } = location.state || {};
+  const { clearCart } = useCartStore();
+  const { setUser } = useAuthStore();
+  const { amount, paymentMethod, checkoutDetails } = location.state || {};
   
   const [upiId, setUpiId] = useState('');
   const [processing, setProcessing] = useState(false);
@@ -26,8 +30,19 @@ const PaymentPage = () => {
     // Simulate payment processing
     setTimeout(async () => {
       try {
-        // Update the order status to PAID in the backend
+        // 1. Create the actual order now that payment is "done"
+        const response = await api.post('/orders/', checkoutDetails);
+        const orderId = response.data.id;
+
+        // 2. Update the order status to PAID in the backend
         await api.put(`/orders/${orderId}/status`, { status: 'paid' }); 
+        
+        // 3. Clear frontend cart
+        clearCart();
+
+        // 4. Refresh User Data (for coupons used)
+        const userRes = await api.get('/user/me');
+        setUser(userRes.data);
         
         setSuccess(true);
         toast.success("Payment successful!");
@@ -35,15 +50,15 @@ const PaymentPage = () => {
           navigate('/orders');
         }, 2000);
       } catch (error) {
-        console.error("Payment update failed:", error);
-        toast.error("Payment successful but status update failed.");
+        console.error("Payment flow failed:", error);
+        toast.error("Order creation failed after payment. Please contact support.");
       } finally {
         setProcessing(false);
       }
     }, 2000);
   };
 
-  if (!orderId) {
+  if (!checkoutDetails) {
     return <div className="text-center py-20 font-bold text-gray-400">Invalid Payment Session</div>;
   }
 

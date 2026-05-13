@@ -328,12 +328,17 @@ def process_return_request(db: Session, seller_id: UUID, return_id: UUID, approv
     return order
 
 def get_seller_orders(db: Session, seller_id: UUID):
-    return db.query(models.Order)\
+    orders = db.query(models.Order)\
         .join(models.OrderItem)\
         .filter(models.OrderItem.seller_id == seller_id)\
         .options(joinedload(models.Order.items), joinedload(models.Order.user))\
         .order_by(models.Order.updated_at.desc())\
         .distinct().all()
+    
+    for order in orders:
+        order.customer_name = order.user.full_name if order.user else "Unknown"
+        
+    return orders
 
 def get_seller_returns(db: Session, seller_id: UUID = None):
     query = db.query(models.Return)\

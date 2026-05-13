@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Zap, Timer, Tag } from 'lucide-react';
 import api from '../../services/api';
 import { useNavigate } from 'react-router-dom';
+import { Sparkles, Megaphone, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const MarketingCarousel = () => {
   const [banners, setBanners] = useState([
@@ -35,6 +35,7 @@ const MarketingCarousel = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (banners.length === 0) return;
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % banners.length);
     }, 5000);
@@ -100,9 +101,6 @@ const MarketingCarousel = () => {
   );
 };
 
-// Dummy component for Sparkles to avoid import errors if not found
-const Sparkles = ({ size }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a12.025 12.025 0 0 1-9.243 0L3 7.5"/><path d="m12 3 1.912 5.813a12.025 12.025 0 0 0 9.243 0L21 7.5"/><path d="m12 21-1.912-5.813a12.025 12.025 0 0 0-9.243 0L3 16.5"/><path d="m12 21 1.912-5.813a12.025 12.025 0 0 1 9.243 0L21 16.5"/></svg>
-);
+
 
 export default MarketingCarousel;

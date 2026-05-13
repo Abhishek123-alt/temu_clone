@@ -57,6 +57,7 @@ This document outlines the relational database structure (PostgreSQL) for the Te
 - `status`: Enum (Pending, Paid, Shipped, Delivered, Cancelled, Returned)
 - `payment_method`: Enum (CreditCard, PayPal, ApplePay, GooglePay, Credits)
 - `tracking_number`: String
+- `carrier`: String (Added for logistics tracking)
 
 ### `order_items`
 - `id`: UUID (PK)
