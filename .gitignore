@@ -111,3 +111,4 @@ build/
 
 ### Project Specific ###
 server/uploads/
+.claude/skills/settings.local.json
