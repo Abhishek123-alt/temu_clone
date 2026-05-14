@@ -83,7 +83,13 @@ const AdminDashboard = () => {
           onClick={() => setActiveTab('campaigns')}
           className={`px-8 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'campaigns' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
         >
-          Flash Sales
+          Campaign
+        </button>
+        <button 
+          onClick={() => setActiveTab('sellers')}
+          className={`px-8 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'sellers' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Seller Onboard Req.
         </button>
       </div>
 
@@ -100,6 +106,7 @@ const AdminDashboard = () => {
         {activeTab === 'categories' && <CategoryManagement />}
         {activeTab === 'disputes' && <DisputeManagement />}
         {activeTab === 'campaigns' && <CampaignControl />}
+        {activeTab === 'sellers' && <SellerApprovalManagement />}
       </div>
     </div>
   );
@@ -142,8 +149,8 @@ const UserTable = () => {
             <td className="px-8 py-5 text-gray-500 font-medium">{u.email}</td>
             <td className="px-8 py-5">
               <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                u.role === 'Admin' ? 'bg-purple-100 text-purple-700' : 
-                u.role === 'Seller' ? 'bg-orange-100 text-orange-700' : 
+                u.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : 
+                u.role === 'SELLER' ? 'bg-orange-100 text-orange-700' : 
                 'bg-blue-100 text-blue-700'
               }`}>
                 {u.role}
@@ -970,6 +977,120 @@ const CampaignControl = () => {
         confirmText="Delete Campaign"
         type="danger"
       />
+    </div>
+  );
+};
+
+const SellerApprovalManagement = () => {
+  const [pendingSellers, setPendingSellers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState(null);
+
+  const fetchPending = async () => {
+    try {
+      const data = await adminService.getPendingSellers();
+      setPendingSellers(data);
+    } catch (error) {
+      console.error('Failed to fetch pending sellers:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPending();
+  }, []);
+
+  const handleReview = async (userId, decision) => {
+    setProcessingId(`${userId}-${decision}`);
+    try {
+      await adminService.reviewSeller(userId, decision);
+      toast.success(`Seller ${decision === 'approve' ? 'Approved' : 'Rejected'} successfully`);
+      fetchPending();
+    } catch (error) {
+      toast.error(`Failed to ${decision} seller`);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  if (loading) return <div className="p-10 text-center text-gray-400">Loading pending applications...</div>;
+
+  return (
+    <div>
+      <div className="p-8 border-b border-gray-50 flex justify-between items-center">
+        <h3 className="text-xl font-bold text-gray-900">Seller Applications</h3>
+        <span className="bg-orange-50 text-orange-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-orange-100">
+          {pendingSellers.length} Pending
+        </span>
+      </div>
+
+      <table className="w-full text-left">
+        <thead className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+          <tr>
+            <th className="px-8 py-4">Applicant</th>
+            <th className="px-8 py-4">Store Details</th>
+            <th className="px-8 py-4">Tax ID</th>
+            <th className="px-8 py-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {pendingSellers.map((ps) => (
+            <tr key={ps.user_id} className="hover:bg-gray-50/50 transition-colors">
+              <td className="px-8 py-6">
+                <div>
+                  <p className="font-bold text-gray-900">{ps.full_name}</p>
+                  <p className="text-xs text-gray-500">{ps.email}</p>
+                </div>
+              </td>
+              <td className="px-8 py-6">
+                {ps.store ? (
+                  <div>
+                    <p className="font-bold text-gray-900 text-sm">{ps.store.store_name}</p>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">{ps.store.business_type}</p>
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-1 italic">"{ps.store.description}"</p>
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-300 italic">No store details provided</span>
+                )}
+              </td>
+              <td className="px-8 py-6">
+                <span className="font-mono text-xs text-gray-600">{ps.store?.tax_id || 'N/A'}</span>
+              </td>
+              <td className="px-8 py-6 text-right">
+                <div className="flex justify-end gap-3">
+                  <button
+                    disabled={!!processingId}
+                    onClick={() => handleReview(ps.user_id, 'reject')}
+                    className="px-4 py-2 text-xs font-black uppercase text-red-500 hover:bg-red-50 rounded-xl transition-all disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {processingId === `${ps.user_id}-reject` && <div className="w-3 h-3 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />}
+                    Reject
+                  </button>
+                  <button
+                    disabled={!!processingId}
+                    onClick={() => handleReview(ps.user_id, 'approve')}
+                    className="bg-gray-900 text-white px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-gray-100 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {processingId === `${ps.user_id}-approve` && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                    Approve
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+          {pendingSellers.length === 0 && (
+            <tr>
+              <td colSpan="4" className="px-8 py-20 text-center">
+                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
+                  <ShieldCheck size={32} />
+                </div>
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No pending applications</p>
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 };

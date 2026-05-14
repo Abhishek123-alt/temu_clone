@@ -32,15 +32,16 @@ const Navbar = () => {
   };
 
   // Routes where the search bar should be hidden
-  const hideSearchRoutes = ['/login', '/register', '/admin', '/seller'];
-  const shouldShowSearch = !hideSearchRoutes.some(route => location.pathname.startsWith(route));
+  const hideSearchRoutes = ['/login', '/register', '/admin', '/seller', '/seller/onboarding'];
+  const isBusinessUser = isAuthenticated && (user?.role === 'ADMIN' || user?.role === 'SELLER');
+  const shouldShowSearch = !isBusinessUser && !hideSearchRoutes.some(route => location.pathname.startsWith(route));
 
   return (
     <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-16 lg:h-20 gap-4">
           {/* Logo */}
-          <Link to={isAuthenticated ? (user?.role === 'Seller' ? '/seller' : (user?.role === 'Admin' ? '/admin' : '/')) : '/'} className="flex-shrink-0 flex items-center">
+          <Link to={isAuthenticated ? (user?.role === 'SELLER' ? '/seller' : (user?.role === 'ADMIN' ? '/admin' : '/')) : '/'} className="flex-shrink-0 flex items-center">
             <span className="text-3xl font-extrabold tracking-tighter text-[#fb7701]">TEMU</span>
           </Link>
 
@@ -81,10 +82,10 @@ const Navbar = () => {
 
           {/* Actions */}
           <div className="flex items-center gap-2 lg:gap-6">
-            {isAuthenticated && user?.role === 'Admin' && (
+            {isAuthenticated && user?.role === 'ADMIN' && (
               <Link to="/admin" className="text-sm font-bold text-gray-700 hover:text-[#fb7701]">Admin</Link>
             )}
-            {isAuthenticated && user?.role === 'Seller' && (
+            {isAuthenticated && user?.role === 'SELLER' && (
               <Link to="/seller" className="text-sm font-bold text-gray-700 hover:text-[#fb7701]">Seller Central</Link>
             )}
 
@@ -100,7 +101,7 @@ const Navbar = () => {
               </Link>
             )}
 
-            {user?.role !== 'Seller' && user?.role !== 'Admin' && (
+            {user?.role !== 'SELLER' && user?.role !== 'ADMIN' && (
               <>
                 <Link to="/profile/quests" className="flex flex-col items-center relative text-gray-700 hover:text-[#fb7701] transition-colors">
                   <Trophy size={24} />

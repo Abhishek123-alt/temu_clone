@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, MapPin, Package, CreditCard, LogOut, ChevronRight, Gift, Sparkles, Heart, History, Edit2, X, Trophy, UserPlus, Copy, Check } from 'lucide-react';
+import { User, MapPin, Package, CreditCard, LogOut, ChevronRight, Gift, Sparkles, Heart, History, Edit2, X, Trophy, UserPlus, Copy, Check, Store } from 'lucide-react';
 import RecentlyViewedSection from '../../components/profile/RecentlyViewedSection';
 import WishlistSection from '../../components/profile/WishlistSection';
 import api from '../../services/api';
@@ -127,7 +127,7 @@ const ProfilePage = () => {
           </div>
 
           {/* Refer a Friend Section */}
-          {user?.role !== 'Seller' && user?.role !== 'Admin' && (
+          {user?.role !== 'SELLER' && user?.role !== 'ADMIN' && user?.role !== 'SELLER_PENDING' && (
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <div className="flex items-center gap-2 mb-6">
                 <UserPlus size={24} className="text-[#fb7701]" />
@@ -183,7 +183,7 @@ const ProfilePage = () => {
           )}
 
           {/* My Rewards Section */}
-          {user?.role !== 'Seller' && user?.role !== 'Admin' && (
+          {user?.role !== 'SELLER' && user?.role !== 'ADMIN' && user?.role !== 'SELLER_PENDING' && (
             <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
               <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
                 <Gift size={24} className="text-[#fb7701]" /> My Rewards
@@ -240,7 +240,7 @@ const ProfilePage = () => {
           animate={{ opacity: 1, x: 0 }}
           className="lg:col-span-2 space-y-8"
         >
-          {user?.role !== 'Seller' && user?.role !== 'Admin' && (
+          {user?.role !== 'SELLER' && user?.role !== 'ADMIN' && (
             <>
               {/* Account Settings Menu */}
               <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
@@ -302,14 +302,34 @@ const ProfilePage = () => {
             </>
           )}
 
-          {user?.role === 'Seller' && (
+
+          {user?.role === 'SELLER_PENDING' && (
+            <div className="bg-white rounded-3xl p-12 shadow-sm border border-orange-100 flex flex-col items-center justify-center text-center h-full relative overflow-hidden">
+              <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center text-orange-400 mb-6 border border-orange-100">
+                <Sparkles size={40} className="animate-pulse" />
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 mb-2">Application in Progress</h3>
+              <p className="text-gray-500 max-w-sm mb-8 font-medium">You've started your seller application. Complete the onboarding wizard to submit it for review.</p>
+              <button
+                onClick={() => navigate('/seller/onboarding')}
+                className="bg-[#fb7701] text-white px-8 py-4 rounded-full font-bold hover:bg-[#e06a01] transition-all shadow-xl shadow-orange-100"
+              >
+                Continue Onboarding
+              </button>
+              <div className="absolute top-0 right-0 p-4">
+                <span className="text-[10px] font-black uppercase tracking-widest text-orange-400 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">Pending Setup</span>
+              </div>
+            </div>
+          )}
+
+          {user?.role === 'SELLER' && (
             <div className="bg-white rounded-3xl p-12 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center h-full">
               <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center text-[#fb7701] mb-6">
                 <Package size={40} />
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-2">Seller Workspace</h3>
               <p className="text-gray-500 max-w-sm mb-8">Head over to Seller Central to manage your products, track orders, and view your performance metrics.</p>
-              <button 
+              <button
                 onClick={() => navigate('/seller')}
                 className="bg-[#fb7701] text-white px-8 py-4 rounded-full font-bold hover:bg-[#e06a01] transition-all shadow-xl shadow-orange-100"
               >
@@ -318,7 +338,7 @@ const ProfilePage = () => {
             </div>
           )}
 
-          {user?.role === 'Admin' && (
+          {user?.role === 'ADMIN' && (
             <div className="bg-white rounded-3xl p-12 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center h-full">
               <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-900 mb-6">
                 <User size={40} />
@@ -335,13 +355,13 @@ const ProfilePage = () => {
           )}
 
           {/* Wishlist Section */}
-          {user?.role !== 'Seller' && user?.role !== 'Admin' && (
+          {user?.role !== 'SELLER' && user?.role !== 'ADMIN' && (
             <WishlistSection />
           )}
 
 
           {/* Recently Viewed Section (Hidden for Sellers & Admins) */}
-          {user?.role !== 'Seller' && user?.role !== 'Admin' && (
+          {user?.role !== 'SELLER' && user?.role !== 'ADMIN' && (
             <RecentlyViewedSection />
           )}
         </motion.div>

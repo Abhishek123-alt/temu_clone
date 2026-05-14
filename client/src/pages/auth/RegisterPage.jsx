@@ -1,19 +1,24 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { motion } from 'framer-motion';
 
 const RegisterPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const initialRole = queryParams.get('role') === 'seller' ? 'SELLER_PENDING' : 'CUSTOMER';
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     full_name: '',
     phone: '',
     referral_code: '',
+    requested_role: initialRole,
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,15 +39,15 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center bg-[#f6f6f6] px-4 py-12">
+    <div className="min-h-[calc(100vh-80px)] flex items-start justify-center bg-[#f6f6f6] px-4 py-10">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-xl w-full bg-white rounded-[32px] shadow-xl shadow-orange-500/5 p-10 border border-gray-50"
+        className="max-w-xl w-full bg-white rounded-[32px] shadow-xl shadow-orange-500/5 p-6 border border-gray-50"
       >
-        <div className="text-center mb-10">
+        <div className="text-center mb-6">
           <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">Join TEMU</h2>
-          <p className="text-gray-500 mt-3 font-medium">Create an account and start saving today</p>
+          <p className="text-gray-500 mt-2 font-medium text-sm">Create an account and start saving today</p>
         </div>
 
         {error && (
@@ -55,13 +60,14 @@ const RegisterPage = () => {
           </motion.div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Full Name</label>
               <input
                 name="full_name"
                 type="text"
+                autoComplete="off"
                 className="input-field"
                 placeholder="John Doe"
                 value={formData.full_name}
@@ -74,6 +80,7 @@ const RegisterPage = () => {
               <input
                 name="phone"
                 type="tel"
+                autoComplete="off"
                 className="input-field"
                 placeholder="+1 234 567 890"
                 value={formData.phone}
@@ -87,6 +94,7 @@ const RegisterPage = () => {
             <input
               name="referral_code"
               type="text"
+              autoComplete="off"
               className="input-field"
               placeholder="Enter code from a friend"
               value={formData.referral_code}
@@ -95,11 +103,13 @@ const RegisterPage = () => {
             />
           </div>
 
+
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Email Address</label>
             <input
               name="email"
               type="email"
+              autoComplete="off"
               className="input-field"
               placeholder="name@example.com"
               value={formData.email}
@@ -112,6 +122,7 @@ const RegisterPage = () => {
             <input
               name="password"
               type="password"
+              autoComplete="new-password"
               className="input-field"
               placeholder="Minimum 8 characters"
               value={formData.password}
@@ -131,11 +142,20 @@ const RegisterPage = () => {
           </button>
         </form>
 
-        <div className="mt-10 pt-10 border-t border-gray-100 text-center">
-          <p className="text-gray-500 font-medium">
+        <div className="mt-4 pt-4 border-t border-gray-100 text-center">
+          <p className="text-gray-500 font-medium text-sm">
             Already have an account?{' '}
             <Link to="/login" className="text-[#fb7701] font-bold hover:underline ml-1">
               Sign In
+            </Link>
+          </p>
+          <p className="text-gray-400 text-xs font-medium mt-2">
+            Want to start selling?{' '}
+            <Link 
+              to="/seller/onboarding"
+              className="text-gray-600 font-bold hover:text-[#fb7701] hover:underline ml-1"
+            >
+              Start your business profile
             </Link>
           </p>
         </div>

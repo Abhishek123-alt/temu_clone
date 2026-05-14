@@ -7,7 +7,7 @@ from app.modules.user import services as user_services
 
 router = APIRouter()
 
-@router.post("/register", response_model=schemas.UserResponse)
+@router.post("/register", response_model=schemas.UserRegisterResponse)
 def register(user_in: schemas.UserRegister, db: Session = Depends(get_db)):
     user = services.get_user_by_email(db, user_in.email)
     if user:
@@ -29,7 +29,15 @@ def register(user_in: schemas.UserRegister, db: Session = Depends(get_db)):
             )
     # Refresh to load relationships (rewards, etc.)
     db.refresh(new_user)
-    return new_user
+    
+    # Generate token so they can finish onboarding immediately
+    access_token = security.create_access_token(subject=new_user.id)
+    
+    return {
+        "user": new_user,
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 
 from app.modules.quest import services as quest_services

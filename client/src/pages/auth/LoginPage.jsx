@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useCartStore } from '../../store/cartStore';
 import { authService } from '../../services/authService';
@@ -14,6 +14,7 @@ const LoginPage = () => {
   const setUser = useAuthStore((state) => state.setUser);
   const fetchCart = useCartStore((state) => state.fetchCart);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,11 +27,17 @@ const LoginPage = () => {
       setUser(user);
       await fetchCart(); // Sync cart with backend after login
       
+      const from = location.state?.from?.pathname || null;
+      
       // Redirect based on role
-      if (user.role === 'Admin') {
+      if (user.role === 'ADMIN') {
         navigate('/admin');
-      } else if (user.role === 'Seller') {
+      } else if (user.role === 'SELLER') {
         navigate('/seller');
+      } else if (user.role === 'SELLER_PENDING') {
+        navigate('/seller/onboarding');
+      } else if (from) {
+        navigate(from, { replace: true });
       } else {
         navigate('/');
       }
@@ -100,11 +107,17 @@ const LoginPage = () => {
           </button>
         </form>
 
-        <div className="mt-10 pt-10 border-t border-gray-100 text-center">
+        <div className="mt-10 pt-10 border-t border-gray-100 text-center space-y-4">
           <p className="text-gray-500 font-medium">
             New to Temu?{' '}
             <Link to="/register" className="text-[#fb7701] font-bold hover:underline ml-1">
               Join for Free
+            </Link>
+          </p>
+          <p className="text-gray-400 text-sm font-medium">
+            Interested in selling?{' '}
+            <Link to="/seller/onboarding" className="text-gray-600 font-bold hover:text-[#fb7701] hover:underline ml-1">
+              Start your business
             </Link>
           </p>
         </div>
