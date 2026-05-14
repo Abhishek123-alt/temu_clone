@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, joinedload
-from app.modules.product.models import Product, Category, WishlistItem, RecentlyViewed, ProductOption, ProductOptionValue, ProductVariant, VariantOptionValue
+from app.modules.product.models import Product, Category, WishlistItem, RecentlyViewed, ProductOption, ProductOptionValue, ProductVariant, VariantOptionValue, ProductImage
 from app.modules.product import schemas
 from app.core.embeddings import generate_embedding
 from typing import List

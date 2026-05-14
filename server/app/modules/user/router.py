@@ -25,9 +25,27 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(reusabl
     user = services.get_user(db, UUID(user_id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+        
+    # Strictly block inactive users from authenticated routes (except Admins)
+    if not user.is_active and user.role != models.UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403, 
+            detail="Your account is currently inactive. If you are a pending seller, please wait for admin approval."
+        )
+        
     return user
 
 router = APIRouter()
+
+@router.post("/me/become-seller")
+def become_seller(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    user = services.become_seller(db, current_user.id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"status": "success", "message": "Your application to become a seller has been submitted!", "role": user.role}
 
 @router.get("/me", response_model=schemas.UserProfile)
 def read_user_me(current_user: models.User = Depends(get_current_user)):

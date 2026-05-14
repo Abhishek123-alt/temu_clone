@@ -7,9 +7,10 @@ import enum
 from app.db.session import Base
 
 class UserRole(str, enum.Enum):
-    CUSTOMER = "Customer"
-    SELLER = "Seller"
-    ADMIN = "Admin"
+    CUSTOMER = "CUSTOMER"
+    SELLER = "SELLER"
+    SELLER_PENDING = "SELLER_PENDING"
+    ADMIN = "ADMIN"
 
 class User(Base):
     __tablename__ = "users"
@@ -20,6 +21,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
     role = Column(Enum(UserRole), default=UserRole.CUSTOMER)
+    is_active = Column(Boolean, default=True)
     spins_left = Column(Integer, default=3)
     referral_code = Column(String, unique=True, index=True)
     referred_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)

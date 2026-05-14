@@ -27,7 +27,7 @@ const StatCard = ({ title, value, icon, trend }) => (
 
 const SellerDashboard = () => {
   const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState('products'); // 'products', 'returns', 'orders', 'payments'
+  const [activeTab, setActiveTab] = useState('products'); // 'products', 'returns', 'orders'
   const [products, setProducts] = useState([]);
   const [returns, setReturns] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -519,12 +519,6 @@ const SellerDashboard = () => {
         >
           Returns {returns.length > 0 && <span className="ml-2 text-[10px] bg-orange-100 px-2 py-0.5 rounded-full">{returns.length}</span>}
         </button>
-        <button 
-          onClick={() => setActiveTab('payments')}
-          className={`px-8 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'payments' ? 'bg-white text-[#fb7701] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          Payments
-        </button>
       </div>
 
       <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 overflow-hidden max-h-[600px] overflow-y-auto">
@@ -766,18 +760,6 @@ const SellerDashboard = () => {
           </div>
         )}
 
-        {activeTab === 'payments' && (
-          <div className="p-12 text-center">
-            <div className="w-24 h-24 bg-orange-50 rounded-full flex items-center justify-center text-[#fb7701] mx-auto mb-6">
-              <CreditCard size={48} />
-            </div>
-            <h3 className="text-2xl font-black text-gray-900 mb-2">Payout Settings</h3>
-            <p className="text-gray-500 font-medium max-w-md mx-auto mb-8">Connect your bank account to start receiving payouts for your completed orders.</p>
-            <button className="bg-[#fb7701] text-white px-8 py-4 rounded-full font-bold hover:bg-[#e06a01] transition-all shadow-xl shadow-orange-100">
-              Connect Bank Account
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Product Modal */}

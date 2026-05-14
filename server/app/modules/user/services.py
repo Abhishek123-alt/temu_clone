@@ -9,6 +9,19 @@ from uuid import UUID
 def generate_referral_code():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
 
+def become_seller(db: Session, user_id: UUID):
+    db_user = get_user(db, user_id)
+    if not db_user:
+        return None
+
+    if db_user.role == models.UserRole.SELLER:
+        return db_user
+
+    db_user.role = models.UserRole.SELLER_PENDING
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
 def get_user(db: Session, user_id: UUID):
     return db.query(models.User).filter(models.User.id == user_id).options(
         joinedload(models.User.addresses),

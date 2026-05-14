@@ -15,6 +15,7 @@ class UserRegister(BaseModel):
     full_name: str
     phone: Optional[str] = None
     referral_code: Optional[str] = None
+    requested_role: Optional[str] = "Customer"
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -28,3 +29,8 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class UserRegisterResponse(BaseModel):
+    user: UserResponse
+    access_token: str
+    token_type: str = "bearer"

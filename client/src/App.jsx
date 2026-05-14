@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import HomePage from './pages/home/HomePage';
 import DealsPage from './pages/home/DealsPage';
 import LoginPage from './pages/auth/LoginPage';
@@ -9,6 +9,7 @@ import QuestsPage from './pages/profile/QuestsPage';
 import WishlistPage from './pages/wishlist/WishlistPage';
 import AddressesPage from './pages/profile/AddressesPage';
 import PaymentMethodsPage from './pages/profile/PaymentMethodsPage';
+import OnboardingWizard from './pages/seller/OnboardingWizard';
 import SellerDashboard from './pages/seller/SellerDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import CartPage from './pages/cart/CartPage';
@@ -24,7 +25,9 @@ import Toast from './components/common/Toast';
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  return isAuthenticated ? children : <Navigate to="/login" />;
+  const location = useLocation();
+  
+  return isAuthenticated ? children : <Navigate to="/login" state={{ from: location }} replace />;
 };
 
 import NewArrivalsPage from './pages/home/NewArrivalsPage';
@@ -102,13 +105,17 @@ function App() {
               </ProtectedRoute>
             } 
           />
-          <Route 
-            path="/seller" 
+          <Route
+            path="/seller/onboarding"
+            element={<OnboardingWizard />}
+          />
+          <Route
+            path="/seller"
             element={
               <ProtectedRoute>
                 <SellerDashboard />
               </ProtectedRoute>
-            } 
+            }
           />
           <Route 
             path="/admin" 
