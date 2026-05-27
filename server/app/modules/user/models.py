@@ -12,6 +12,17 @@ class UserRole(str, enum.Enum):
     SELLER_PENDING = "SELLER_PENDING"
     ADMIN = "ADMIN"
 
+class AuthProvider(str, enum.Enum):
+    """Where this account was originally authenticated.
+
+    Stored on User so we can tell at a glance whether an account has a usable
+    password (LOCAL) or was created via a social provider (GOOGLE/etc., where
+    `password_hash` is just a random unguessable value). Add new social
+    providers here as they're implemented (FACEBOOK, APPLE, GITHUB...).
+    """
+    LOCAL = "LOCAL"
+    GOOGLE = "GOOGLE"
+
 class User(Base):
     __tablename__ = "users"
 
@@ -25,6 +36,13 @@ class User(Base):
     spins_left = Column(Integer, default=3)
     referral_code = Column(String, unique=True, index=True)
     referred_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    provider = Column(
+        Enum(AuthProvider, name="authprovider"),
+        default=AuthProvider.LOCAL,
+        nullable=False,
+        server_default=AuthProvider.LOCAL.value,
+    )
+    provider_subject = Column(String, nullable=True, index=True)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     addresses = relationship("Address", back_populates="user", cascade="all, delete-orphan")
@@ -37,6 +55,7 @@ class Address(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    name = Column(String, nullable=True)
     street = Column(String, nullable=False)
     city = Column(String, nullable=False)
     state = Column(String, nullable=False)

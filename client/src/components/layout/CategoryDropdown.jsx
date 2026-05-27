@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, LayoutGrid, Sparkles, Zap, Star } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { productService } from '../../services/productService';
@@ -9,6 +9,7 @@ const CategoryDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const containerRef = useRef(null);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -22,22 +23,42 @@ const CategoryDropdown = () => {
     fetchCategories();
   }, []);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen]);
+
   const handleCategoryClick = (categoryId) => {
     setIsOpen(false);
-    const queryParams = new URLSearchParams(location.search);
+    const listingPaths = ['/', '/search'];
+    const onListingPage = listingPaths.includes(location.pathname);
+    const queryParams = new URLSearchParams(onListingPage ? location.search : '');
     if (categoryId) {
       queryParams.set('category_id', categoryId);
     } else {
       queryParams.delete('category_id');
     }
-    navigate(`${location.pathname}?${queryParams.toString()}`);
+    const targetPath = onListingPage ? location.pathname : '/search';
+    navigate(`${targetPath}?${queryParams.toString()}`);
   };
 
   return (
-    <div className="relative" onMouseLeave={() => setIsOpen(false)}>
-      <button 
-        onMouseEnter={() => setIsOpen(true)}
-        onClick={() => setIsOpen(!isOpen)}
+    <div className="relative" ref={containerRef}>
+      <button
+        onClick={() => setIsOpen((prev) => !prev)}
         className={`flex items-center gap-2 text-sm font-black uppercase tracking-tighter h-10 px-6 rounded-full transition-all duration-300 ${
           isOpen ? 'bg-[#fb7701] text-white shadow-lg shadow-orange-200' : 'text-gray-700 hover:bg-gray-100'
         }`}
@@ -56,14 +77,8 @@ const CategoryDropdown = () => {
             className="absolute top-12 left-0 w-[480px] bg-white border border-gray-100 shadow-2xl rounded-[32px] p-6 z-50 overflow-hidden"
           >
             <div className="grid grid-cols-2 gap-2">
-              <div className="col-span-2 mb-4 flex items-center justify-between px-2">
+              <div className="col-span-2 mb-4 px-2">
                 <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Shop by Category</h3>
-                <button 
-                  onClick={() => handleCategoryClick(null)}
-                  className="text-xs font-bold text-[#fb7701] hover:underline"
-                >
-                  View All
-                </button>
               </div>
 
               {/* Quick Links */}

@@ -33,6 +33,18 @@ class Order(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     total_amount = Column(Float, nullable=False)
+
+    # Money breakdown of total_amount — set at order creation so admin / seller
+    # can each attribute the customer's payment to the right place:
+    #   shipping_amount  → seller (covers fulfilment)
+    #   tax_amount       → govt (passthrough; admin only holds it briefly)
+    #   platform_fee     → admin (flat $0.30 + 2% of order — Stripe-style)
+    #   discount_amount  → platform absorbs (marketing spend)
+    shipping_amount = Column(Float, nullable=False, default=0.0)
+    tax_amount = Column(Float, nullable=False, default=0.0)
+    platform_fee = Column(Float, nullable=False, default=0.0)
+    discount_amount = Column(Float, nullable=False, default=0.0)
+
     status = Column(Enum(OrderStatus), default=OrderStatus.PENDING)
     shipping_address = Column(String, nullable=False)
     billing_address = Column(String, nullable=True)
@@ -55,10 +67,16 @@ class OrderItem(Base):
     seller_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     quantity = Column(Integer, nullable=False)
     price = Column(Float, nullable=False) # Price at time of purchase
-    
+
     # Snapshot of product info
     product_title = Column(String, nullable=True)
     product_image = Column(String, nullable=True)
+
+    # Commission snapshot — the rate at order time and the absolute amount the
+    # platform earns on this line (price * qty * rate). Frozen here so later
+    # rate changes on the store don't retroactively rewrite history.
+    commission_rate = Column(Float, nullable=False, default=0.0)
+    commission_amount = Column(Float, nullable=False, default=0.0)
 
     order = relationship("Order", back_populates="items")
     product = relationship("Product")

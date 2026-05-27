@@ -1,9 +1,9 @@
 import uuid
 import enum
 from datetime import datetime, UTC
-from sqlalchemy import Column, String, Float, Integer, ForeignKey, Boolean, Text, Enum, DateTime
+from sqlalchemy import Column, String, Float, Integer, ForeignKey, Boolean, Text, Enum, DateTime, Index
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from pgvector.sqlalchemy import Vector
 from app.db.session import Base
 
@@ -16,11 +16,32 @@ class Category(Base):
     description = Column(Text, nullable=True)
     image_url = Column(String, nullable=True)
     parent_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True)
+    embedding = Column(Vector(384))  # name + description, used for semantic search
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     parent = relationship("Category", remote_side=[id], backref="subcategories")
     products = relationship("Product", back_populates="category")
+    attribute_definitions = relationship("CategoryAttributeDefinition", back_populates="category", cascade="all, delete-orphan")
+
+
+class CategoryAttributeDefinition(Base):
+    """Defines what dynamic fields a category supports (e.g. Laptops → ram, storage, brand)."""
+    __tablename__ = "category_attribute_definitions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
+    key = Column(String, nullable=False)        # e.g. "ram"
+    label = Column(String, nullable=False)      # e.g. "RAM"
+    # type: "select" | "text" | "number" | "boolean"
+    field_type = Column(String, nullable=False, default="text")
+    # JSON array of allowed values for "select" type, e.g. ["8GB","16GB","32GB"]
+    options = Column(JSONB, nullable=True)
+    filterable = Column(Boolean, default=True)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+
+    category = relationship("Category", back_populates="attribute_definitions")
 
 class Product(Base):
     __tablename__ = "products"
@@ -39,8 +60,14 @@ class Product(Base):
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
     seller_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     embedding = Column(Vector(384)) # Dimension for all-MiniLM-L6-v2
+    # Dynamic category-specific fields, e.g. {"ram": "16GB", "brand": "Dell"}
+    attributes = Column(JSONB, nullable=True, default=dict)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+
+    __table_args__ = (
+        Index("ix_products_attributes_gin", "attributes", postgresql_using="gin"),
+    )
 
     category = relationship("Category", back_populates="products")
     seller = relationship("User") # Link to the User who is the seller

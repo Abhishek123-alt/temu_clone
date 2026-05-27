@@ -5,19 +5,32 @@ import { Star, ShoppingCart, Check } from 'lucide-react';
 import { useCartStore } from '../../store/cartStore';
 import { useWishlistStore } from '../../store/wishlistStore';
 import { Heart } from 'lucide-react';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const ProductCard = ({ product }) => {
   const { addToCart } = useCartStore();
   const { toggleWishlist, isInWishlist } = useWishlistStore();
+  const { t } = useTranslation();
   const [adding, setAdding] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  const outOfStock = typeof product.stock === 'number' && product.stock <= 0;
 
   const handleAddToCart = async (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (outOfStock) return;
     setAdding(true);
     try {
-      await addToCart(product.id, null, 1);
+      // Snapshot the product so guest-cart can render it from localStorage
+      // without a backend round-trip. Authed flow ignores this.
+      await addToCart(product.id, null, 1, {
+        id: product.id,
+        title: product.title,
+        slug: product.slug,
+        price: product.price,
+        images: product.images || [],
+      });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (error) {
@@ -26,40 +39,47 @@ const ProductCard = ({ product }) => {
       setAdding(false);
     }
   };
-  const mainImage = product.images?.length > 0 
+  const mainImage = product.images?.length > 0
     ? (product.images.find(img => img.is_main)?.url || product.images[0]?.url)
     : 'https://via.placeholder.com/400x400?text=No+Image';
-  const discount = product.original_price 
-    ? Math.round(((product.original_price - product.price) / product.original_price) * 100) 
+  const discount = product.original_price
+    ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
     : 0;
 
   return (
-    <motion.div 
-      whileHover={{ y: -5 }}
-      className="card group cursor-pointer overflow-hidden"
+    <motion.div
+      whileHover={outOfStock ? {} : { y: -5 }}
+      className={`card group overflow-hidden ${outOfStock ? 'opacity-70' : 'cursor-pointer'}`}
     >
-      <Link to={`/product/${product.slug}`}>
+      <Link to={`/product/${product.slug}`} className={outOfStock ? 'pointer-events-none' : ''}>
         {/* Image Container */}
         <div className="relative aspect-square overflow-hidden bg-gray-50">
-          <img 
-            src={mainImage} 
+          <img
+            src={mainImage}
             alt={product.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className={`w-full h-full object-cover transition-transform duration-500 ${outOfStock ? 'grayscale' : 'group-hover:scale-105'}`}
           />
-          {discount > 0 && (
+          {discount > 0 && !outOfStock && (
             <div className="absolute top-2 left-2 bg-[#fb7701] text-white text-[10px] font-bold px-2 py-1 rounded-md">
               -{discount}%
             </div>
           )}
-          
+          {outOfStock && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+              <span className="bg-white text-gray-900 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full">
+                {t('product.out_of_stock')}
+              </span>
+            </div>
+          )}
+
           {/* Wishlist Button Overlay */}
-          <button 
+          <button
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               toggleWishlist(product);
             }}
-            className={`absolute top-2 right-2 p-1.5 rounded-full shadow-sm transition-all z-10 ${
+            className={`absolute top-2 right-2 p-1.5 rounded-full shadow-sm transition-all z-10 pointer-events-auto ${
               isInWishlist(product.id)
               ? 'bg-red-50 text-red-500'
               : 'bg-white/80 text-gray-400 hover:text-red-500'
@@ -74,7 +94,7 @@ const ProductCard = ({ product }) => {
           <h3 className="text-sm text-gray-700 line-clamp-2 font-medium h-10 mb-1">
             {product.title}
           </h3>
-          
+
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1">
               <div className="flex text-yellow-400">
@@ -82,7 +102,7 @@ const ProductCard = ({ product }) => {
               </div>
               <span className="text-[10px] text-gray-400 font-bold">{product.rating}</span>
             </div>
-            <span className="text-[10px] text-gray-400 font-bold bg-gray-100 px-1.5 py-0.5 rounded">{product.sales_count || 0} sold</span>
+            <span className="text-[10px] text-gray-400 font-bold bg-gray-100 px-1.5 py-0.5 rounded">{t('product.sold', { count: product.sales_count || 0 })}</span>
           </div>
 
           <div className="flex items-baseline gap-2">
@@ -95,20 +115,23 @@ const ProductCard = ({ product }) => {
       </Link>
 
       <div className="p-3 pt-0">
-        <button 
+        <button
           onClick={handleAddToCart}
-          disabled={adding}
+          disabled={adding || outOfStock}
           className={`w-full mt-3 border py-1.5 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-            success ? 'bg-green-500 text-white border-green-500' : 
+            outOfStock ? 'border-gray-100 text-gray-300 bg-gray-50 cursor-not-allowed' :
+            success ? 'bg-green-500 text-white border-green-500' :
             'border-gray-200 text-gray-700 hover:bg-[#fb7701] hover:text-white hover:border-[#fb7701]'
           }`}
         >
-          {adding ? (
+          {outOfStock ? (
+            t('product.out_of_stock')
+          ) : adding ? (
             <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
           ) : success ? (
-            <><Check size={14} /> Added</>
+            <><Check size={14} /> {t('product.added')}</>
           ) : (
-            <><ShoppingCart size={14} /> Add to Cart</>
+            <><ShoppingCart size={14} /> {t('product.add_to_cart')}</>
           )}
         </button>
       </div>

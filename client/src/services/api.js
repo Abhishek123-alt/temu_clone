@@ -23,13 +23,24 @@ api.interceptors.response.use(
   },
   (error) => {
     console.error('❌ API Error:', error.response?.status, error.config?.url, error.response?.data);
-    
-    // Automatically log out if token expires (401 Unauthorized)
+
+    // Automatically log out if a token expires on an authenticated request.
+    // Skip /auth/login and /auth/register — those endpoints return 401 to signal
+    // bad credentials, and the caller must be allowed to render that message
+    // without the interceptor force-reloading the page out from under it.
+    // Also skip when there is no token: an unauthenticated guest browsing the
+    // store may hit an endpoint that requires auth (e.g. /products/recommended);
+    // those calls should fail quietly, not yank the guest off to /login.
     if (error.response && error.response.status === 401) {
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
+      const url = error.config?.url || '';
+      const isAuthEntryPoint = url.includes('/auth/login') || url.includes('/auth/register');
+      const hasToken = !!useAuthStore.getState().token;
+      if (!isAuthEntryPoint && hasToken) {
+        useAuthStore.getState().logout();
+        window.location.href = '/login';
+      }
     }
-    
+
     return Promise.reject(error);
   }
 );

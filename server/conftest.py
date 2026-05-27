@@ -48,6 +48,8 @@ from app.modules.order.models import Order, OrderItem, OrderEvent, Shipment, Ret
 from app.modules.cart.models import Cart, CartItem
 from app.modules.flash_sale.models import FlashSale, FlashSaleProduct
 from app.modules.quest.models import Quest, UserQuestProgress
+from app.modules.support.models import SupportTicket
+from app.modules.gamification.models import MiniGameState
 
 # Use an in-memory SQLite database for tests
 TEST_DATABASE_URL = "sqlite:///:memory:"

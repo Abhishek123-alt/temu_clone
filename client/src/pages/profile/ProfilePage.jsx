@@ -50,8 +50,20 @@ const ProfilePage = () => {
       }
     };
 
+    // Refresh the cached user so rewards minted by quest completion
+    // (auto-granted server-side, no client event) show up in My Rewards.
+    const refreshUser = async () => {
+      try {
+        const res = await api.get('/user/me');
+        setUser(res.data);
+      } catch (error) {
+        console.error("Failed to refresh user:", error);
+      }
+    };
+
     fetchReferralCode();
-  }, []);
+    refreshUser();
+  }, [setUser]);
 
   const handleCopyReferralCode = async () => {
     if (!referralCode) return;

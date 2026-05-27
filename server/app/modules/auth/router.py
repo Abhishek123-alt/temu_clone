@@ -53,6 +53,22 @@ def login(user_in: schemas.UserLogin, db: Session = Depends(get_db)):
         )
     
     quest_services.update_quest_progress(db, user.id, "DAILY_LOGIN")
-    
+
+    access_token = security.create_access_token(subject=user.id)
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/google", response_model=schemas.Token)
+def google_login(payload: schemas.GoogleLoginRequest, db: Session = Depends(get_db)):
+    google_payload = services.verify_google_id_token(payload.credential)
+    user = services.get_or_create_google_user(db, google_payload)
+
+    # If this is a fresh signup with a referral code, attempt to process it.
+    # process_referral is idempotent — if already linked, it returns True
+    # without granting another reward.
+    if payload.referral_code:
+        user_services.process_referral(db, user.id, payload.referral_code.strip())
+
+    quest_services.update_quest_progress(db, user.id, "DAILY_LOGIN")
     access_token = security.create_access_token(subject=user.id)
     return {"access_token": access_token, "token_type": "bearer"}

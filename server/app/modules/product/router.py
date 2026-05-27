@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 import shutil
 import os
 import uuid
+import json
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.modules.product import schemas, services
-from typing import List
+from typing import Dict, List, Optional
 from app.modules.user.models import User, UserRole
 from app.modules.user.router import get_current_user
 from uuid import UUID
@@ -48,9 +49,57 @@ def get_recommended_products(
     return services.get_recommended_products(db, user_id=current_user.id, limit=limit)
 
 @router.get("/", response_model=List[schemas.ProductResponse])
-def read_products(skip: int = 0, limit: int = 20, search: str = None, deal_only: bool = False, normal_only: bool = False, category_id: str = None, new_arrivals: bool = False, sort_by: str = None, db: Session = Depends(get_db)):
-    products = services.get_products(db, skip=skip, limit=limit, search=search, deal_only=deal_only, normal_only=normal_only, category_id=category_id, new_arrivals=new_arrivals, sort_by=sort_by)
+def read_products(
+    skip: int = 0,
+    limit: int = 20,
+    search: str = None,
+    deal_only: bool = False,
+    normal_only: bool = False,
+    category_id: str = None,
+    new_arrivals: bool = False,
+    sort_by: str = None,
+    price_min: Optional[float] = None,
+    price_max: Optional[float] = None,
+    include_out_of_stock: bool = False,
+    # JSON-encoded attribute filters, e.g. {"ram":"16GB","brand":"Dell"}
+    filters: Optional[str] = Query(None, description='JSON object of attribute filters e.g. {"ram":"16GB"}'),
+    db: Session = Depends(get_db)
+):
+    attribute_filters = None
+    if filters:
+        try:
+            attribute_filters = json.loads(filters)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="filters must be valid JSON")
+
+    products = services.get_products(
+        db, skip=skip, limit=limit, search=search, deal_only=deal_only,
+        normal_only=normal_only, category_id=category_id, new_arrivals=new_arrivals,
+        sort_by=sort_by, attribute_filters=attribute_filters,
+        price_min=price_min, price_max=price_max,
+        include_out_of_stock=include_out_of_stock,
+    )
     return products
+
+@router.get("/facets", response_model=schemas.ProductFacetsResponse)
+def read_product_facets(
+    search: Optional[str] = None,
+    category_id: Optional[str] = None,
+    deal_only: bool = False,
+    normal_only: bool = False,
+    new_arrivals: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Aggregate attribute facets + price range for products matching the
+    given base filters. Used by the search page to drive its filter sidebar."""
+    return services.get_product_facets(
+        db,
+        search=search,
+        category_id=category_id,
+        deal_only=deal_only,
+        normal_only=normal_only,
+        new_arrivals=new_arrivals,
+    )
 
 @router.get("/categories", response_model=List[schemas.CategoryResponse])
 def read_categories(db: Session = Depends(get_db)):
@@ -92,6 +141,49 @@ def delete_category(
     if not success:
         raise HTTPException(status_code=404, detail="Category not found")
     return {"status": "success"}
+
+@router.get("/categories/{category_id}/attributes", response_model=List[schemas.CategoryAttributeDefinitionResponse])
+def get_category_attributes(category_id: UUID, db: Session = Depends(get_db)):
+    """Return the dynamic field definitions for a category (used to build forms and filter sidebars)."""
+    return services.get_category_attribute_definitions(db, str(category_id))
+
+@router.post("/categories/{category_id}/attributes", response_model=schemas.CategoryAttributeDefinitionResponse)
+def create_category_attribute(
+    category_id: UUID,
+    definition_in: schemas.CategoryAttributeDefinitionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Only admins can manage attribute definitions")
+    return services.create_attribute_definition(db, str(category_id), definition_in)
+
+@router.put("/attributes/{definition_id}", response_model=schemas.CategoryAttributeDefinitionResponse)
+def update_category_attribute(
+    definition_id: UUID,
+    definition_in: schemas.CategoryAttributeDefinitionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Only admins can manage attribute definitions")
+    result = services.update_attribute_definition(db, str(definition_id), definition_in)
+    if not result:
+        raise HTTPException(status_code=404, detail="Attribute definition not found")
+    return result
+
+@router.delete("/attributes/{definition_id}")
+def delete_category_attribute(
+    definition_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Only admins can manage attribute definitions")
+    if not services.delete_attribute_definition(db, str(definition_id)):
+        raise HTTPException(status_code=404, detail="Attribute definition not found")
+    return {"status": "success"}
+
 
 @router.get("/me", response_model=List[schemas.ProductResponse])
 def read_my_products(

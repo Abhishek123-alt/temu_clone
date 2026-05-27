@@ -13,3 +13,5 @@ pytest
 httpx
 pgvector
 sentence-transformers
+google-auth
+requests

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Search, Menu, Bell, Heart, X, Trophy, Zap } from 'lucide-react';
+import { ShoppingCart, User, Search, Menu, Bell, Heart, X, Trophy, Zap, Gamepad2 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useCartStore } from '../../store/cartStore';
 import { useWishlistStore } from '../../store/wishlistStore';
 import { useEffect } from 'react';
 
 import CategoryDropdown from './CategoryDropdown';
+import LanguageSwitcher from './LanguageSwitcher';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const Navbar = () => {
   const { user, isAuthenticated } = useAuthStore();
@@ -15,6 +17,7 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -48,11 +51,11 @@ const Navbar = () => {
           {/* Search Bar & Categories */}
           {shouldShowSearch ? (
             <div className="hidden md:flex flex-grow max-w-3xl items-center gap-2">
-              <CategoryDropdown />
+              {location.pathname === '/' && <CategoryDropdown />}
               <form onSubmit={handleSearch} className="relative w-full">
                 <input
                   type="text"
-                  placeholder="Search for items..."
+                  placeholder={t('nav.search_placeholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full bg-gray-100 border-none rounded-full py-2.5 pl-5 pr-20 focus:ring-2 focus:ring-[#fb7701] transition-all"
@@ -82,22 +85,33 @@ const Navbar = () => {
 
           {/* Actions */}
           <div className="flex items-center gap-2 lg:gap-6">
+            <LanguageSwitcher />
+
             {isAuthenticated && user?.role === 'ADMIN' && (
-              <Link to="/admin" className="text-sm font-bold text-gray-700 hover:text-[#fb7701]">Admin</Link>
+              <Link to="/admin" className="text-sm font-bold text-gray-700 hover:text-[#fb7701]">{t('nav.admin')}</Link>
             )}
             {isAuthenticated && user?.role === 'SELLER' && (
-              <Link to="/seller" className="text-sm font-bold text-gray-700 hover:text-[#fb7701]">Seller Central</Link>
+              <Link to="/seller" className="text-sm font-bold text-gray-700 hover:text-[#fb7701]">{t('nav.seller_central')}</Link>
             )}
 
             {isAuthenticated ? (
-              <Link to="/profile" className="flex flex-col items-center text-gray-700 hover:text-[#fb7701] transition-colors">
-                <User size={24} />
-                <span className="text-[10px] font-medium hidden lg:block">{user?.full_name?.split(' ')[0]}</span>
-              </Link>
+              <>
+                <Link to="/profile" className="flex flex-col items-center text-gray-700 hover:text-[#fb7701] transition-colors">
+                  <User size={24} />
+                  <span className="text-[10px] font-medium hidden lg:block">{user?.full_name?.split(' ')[0]}</span>
+                </Link>
+
+                {user?.role !== 'SELLER' && user?.role !== 'ADMIN' && (
+                  <Link to="/profile/games" className="flex flex-col items-center text-gray-700 hover:text-[#fb7701] transition-colors">
+                    <Gamepad2 size={24} />
+                    <span className="text-[10px] font-medium hidden lg:block">Games</span>
+                  </Link>
+                )}
+              </>
             ) : (
               <Link to="/login" className="flex flex-col items-center text-gray-700 hover:text-[#fb7701] transition-colors">
                 <User size={24} />
-                <span className="text-[10px] font-medium hidden lg:block">Sign In</span>
+                <span className="text-[10px] font-medium hidden lg:block">{t('nav.signin')}</span>
               </Link>
             )}
 
@@ -105,12 +119,12 @@ const Navbar = () => {
               <>
                 <Link to="/profile/quests" className="flex flex-col items-center relative text-gray-700 hover:text-[#fb7701] transition-colors">
                   <Trophy size={24} />
-                  <span className="text-[10px] font-medium hidden lg:block">Quests</span>
+                  <span className="text-[10px] font-medium hidden lg:block">{t('nav.quests')}</span>
                 </Link>
 
                 <Link to="/wishlist" className="flex flex-col items-center relative text-gray-700 hover:text-[#fb7701] transition-colors">
                   <Heart size={24} />
-                  <span className="text-[10px] font-medium hidden lg:block">Wishlist</span>
+                  <span className="text-[10px] font-medium hidden lg:block">{t('nav.wishlist')}</span>
                   {wishlist.length > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
                       {wishlist.length}
@@ -120,7 +134,7 @@ const Navbar = () => {
 
                 <Link to="/cart" className="flex flex-col items-center relative text-gray-700 hover:text-[#fb7701] transition-colors">
                   <ShoppingCart size={24} />
-                  <span className="text-[10px] font-medium hidden lg:block">Cart</span>
+                  <span className="text-[10px] font-medium hidden lg:block">{t('nav.cart')}</span>
                   {getTotalItems() > 0 && (
                     <span className="absolute -top-1 -right-1 bg-[#fb7701] text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
                       {getTotalItems()}

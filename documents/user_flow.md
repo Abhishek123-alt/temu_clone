@@ -1,50 +1,58 @@
-# User Flow & Experience: Temu Clone
+# User Flow & Experience — Temu Clone
 
-This document defines the primary user journeys within the Temu clone application, focusing on discovery, conversion, and retention.
-
-## 1. Landing & Discovery Flow
-The "Discovery-First" approach ensures users see relevant products immediately.
-1.  **Landing:** User arrives on the Home Page.
-2.  **Personalized Feed:** Infinite scroll displays products based on "Recommended" (AI-driven).
-3.  **Category Browsing:** User clicks on a category (e.g., "Home & Kitchen").
-4.  **Search:** User searches for a specific keyword with autocomplete suggestions.
-5.  **PDP (Product Detail Page):** User clicks a product card to view details, reviews, and dynamic pricing.
-
-## 2. Retention (Gamification) Flow
-Engagement is driven by games and "free gift" mechanics.
-1.  **Daily Check-in:** User logs in and receives a "Daily Reward" popup.
-2.  **The Prize Wheel:** Post-registration or periodic "Spin to Win" for coupons.
-3.  **The "Free Gift" Hook:** User picks a "Free Gift" but must invite 3 friends to "claim" it (Referral loop).
-4.  **Mini-Games:** User plays "Fishland" or similar to earn credits toward purchases.
-
-## 3. Cart & Checkout Flow (Conversion)
-1.  **Add to Cart:** User adds items with specific variants (Size/Color).
-2.  **Cart Review:** User sees "Free Shipping" progress bar (e.g., "Add $5 more for free shipping").
-3.  **Coupons:** Automatic application of the best available coupon.
-4.  **Checkout:** 
-    - Enter/Select Shipping Address.
-    - Choose Payment Method (Card, PayPal, Apple Pay).
-    - Review final price (Item + Tax - Discount).
-5.  **Success:** Order Confirmation page with estimated delivery date.
-
-## 4. Order Management Flow
-1.  **Tracking:** User goes to "My Orders" -> "Track Package."
-2.  **Real-time Updates:** Push notifications at every milestone (Shipped, Out for Delivery, Delivered).
-3.  **Returns:** One-click return initiation for eligible items.
-
-## 5. Seller Management Flow (Implemented)
-1.  **Inventory Management:** Seller logs in -> Adds/Edits product -> Uploads images -> Sets pricing/stock.
-2.  **Order Fulfillment:** Seller receives "Paid" order -> Clicks "Ship Now" -> Enters carrier and tracking number -> Order status updates to "Shipped".
-3.  **Return Processing:** Seller views return request -> Reviews reason -> Approves or Rejects the return.
-4.  **Analytics Tracking:** Seller views Revenue Analysis chart -> Filters by date range to monitor growth.
-
-## 6. Admin Oversight Flow (Implemented)
-1.  **Platform Monitoring:** Admin logs in -> Views global stats (Total Sales, Total Customers, Active Products).
-2.  **User Audit:** Admin views list of all registered users to manage platform participants.
+Primary user journeys, mapped to the routes and modules that are actually implemented today. Roles: `CUSTOMER`, `SELLER_PENDING`, `SELLER`, `ADMIN`.
 
 ---
 
-## 7. Viral Growth Flow (Referrals)
-1.  **Invite:** User clicks "Earn $20 Credit."
-2.  **Share:** Copy unique link or share directly to WhatsApp/Social Media.
-3.  **Reward:** Once the referred user completes their first order, the referrer receives credit.
+## 1. Onboarding (Buyer)
+1. **Register** at `/register` (optionally with referral code). Token is returned immediately.
+2. **Land** on `/` (HomePage): marketing carousel → flash sale section → personalized feed (`/products/recommended`).
+3. **Browse**: mega-menu via `CategoryDropdown` → `/search?category_id=…`, or use search bar (semantic + token expansion).
+4. **PDP** at `/product/:slug`: gallery, variants (Color/Size → SKU), reviews, related products. View bumps `PRODUCT_VIEW` quest.
+
+## 2. Buy Flow
+1. **Add to cart** (optionally with `variant_id`) → cart drawer.
+2. `/cart` — review items.
+3. `/checkout` — pick shipping address + reward/coupon.
+4. `/payment` — pick stored payment method.
+5. Order created via `POST /orders/`. Active flash-sale prices override cart price automatically.
+6. `/orders` and `/orders/:orderId` track lifecycle (`pending → paid → packed → shipped → delivered`).
+7. Customer can request a return from a delivered order; seller approves/rejects.
+
+## 3. Retention & Gamification
+1. **Daily login** → `DAILY_LOGIN` quest progress bumped by `/auth/login`.
+2. **Spin-the-wheel** at `/profile/quests` (or post-register popup) → `POST /user/use-spin` decrements `users.spins_left` and may grant a `Reward` (coupon/credit/freeship/gift).
+3. **Quests** (`/profile/quests`) show role-targeted quests and progress.
+4. **Flash sales** (`/deals` and home section) — viewing a sale bumps `FLASH_SALE_VIEW`.
+5. **Referrals**: `/user/me/referral` returns the user's code; redemption via `/user/me/redeem-referral?code=` grants $5 credit and a one-time `referred_by` link.
+
+## 4. Seller Journey
+1. Customer clicks "Sell on Temu" → `POST /user/me/become-seller` flips role to `SELLER_PENDING`.
+2. **Onboarding wizard** at `/seller/onboarding` submits `POST /store/application` (store profile + tax/warehouse details). Drafts saved via `PATCH /store/application/draft`.
+3. Application sits in `PENDING` until admin approves (sees role/store activate) or rejects (role → `CUSTOMER`, user deactivated, store `REJECTED`).
+4. Active sellers use `/seller`:
+   - Product CRUD (with image upload, options, variants, dynamic category attributes).
+   - Orders inbox (`/orders/seller/orders`) → enter shipment carrier + tracking (`POST /orders/{id}/shipments`).
+   - Returns inbox (`/orders/seller/returns`) → approve/reject (`POST /orders/returns/{id}/process`).
+   - Sales chart driven by `/admin/sales-orders?seller_id=<self>`.
+
+## 5. Admin Oversight
+1. `/admin` (role-gated UI):
+   - KPI cards from `/admin/stats` (customers, sellers, products, total delivered sales).
+   - User table with active/inactive toggle (`PATCH /admin/users/{id}/active`).
+   - Pending sellers queue → approve/reject flips both `User.role` and `Store.status`.
+   - Per-seller sales chart.
+   - Category and category-attribute CRUD.
+   - Flash sale CRUD.
+   - Disputes view: returns rejected by sellers, surfaced via `/orders/seller/returns?admin_view=true`.
+
+## 6. Search & Discovery internals
+- Free-text search (`?search=`) is tokenized, embedded (sentence-transformers), and used to:
+  1. ILIKE-match `Product.title` / `Product.description` per token.
+  2. Cosine-distance match against `categories.embedding` (`< 0.35`) to surface semantically-close categories.
+  3. Expand matched categories to their direct children so a search for a parent surfaces all subcategory products.
+- `?filters={"ram":"16GB","brand":"Dell"}` filters via JSONB containment on `products.attributes`.
+- `/products/facets` returns the set of attribute values and the price range matching the current base filters — used to render the search filter sidebar.
+
+## 7. Returns / Refund State Machine
+`return_requested → return_approved → in_transit → received → refunded` (happy path), or `return_requested → return_rejected` (dispute). Rejected returns become Admin-visible disputes. Every transition writes an `OrderEvent`.

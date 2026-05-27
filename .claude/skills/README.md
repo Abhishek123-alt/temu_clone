@@ -1,107 +1,73 @@
-# Claude Skills — Temu Clone (React + FastAPI)
+# Claude Skills — Temu Clone (React 19 + FastAPI)
 
-This folder contains Claude Code / Cowork skills tailored to a Temu-style e-commerce app
-with a React frontend and a FastAPI backend. Each skill is a focused playbook Claude will
-load automatically when its triggers match the task you're working on.
+Project-specific Claude Code skills for a Temu-style e-commerce marketplace. Each skill is a focused playbook Claude auto-loads when its description matches the task at hand. Skills here describe **how this project does things**, not generic best practices — they reference the actual file layout, library choices, and conventions in this repo.
 
-## Installation
+## Tech stack the skills are calibrated for
 
-This folder lives at the project root as `.claude/skills/`:
+- **Frontend**: React 19 + Vite + Tailwind CSS, Zustand, TanStack Query, react-router-dom v7, Framer Motion, lucide-react, axios, `@tanstack/react-virtual`, `canvas-confetti`. Pure JSX (no TypeScript).
+- **Backend**: FastAPI, SQLAlchemy 2.0, PostgreSQL + `pgvector`, Alembic, `python-jose` JWT, `passlib[bcrypt]`, `sentence-transformers` (`all-MiniLM-L6-v2`, 384-dim).
+- **Testing**: pytest + SQLite in-memory via `server/conftest.py`.
+
+## Layout
 
 ```
-temu_clone/
-├── .claude/
-│   └── skills/
-│       ├── react-component-builder/SKILL.md
-│       ├── fastapi-endpoint-builder/SKILL.md
-│       └── ... (28 skills)
-├── frontend/
-└── backend/
+.claude/skills/
+├── README.md                       (this file)
+├── INDEX.md                        (directory + task → skill mapping)
+│
+├── # Backend
+├── api-contract-builder/SKILL.md
+├── fastapi-endpoint-builder/SKILL.md
+├── auth-jwt/SKILL.md
+├── postgres-schema/SKILL.md
+├── embeddings-search/SKILL.md
+├── order-management/SKILL.md
+├── payment-integration/SKILL.md
+├── media-storage/SKILL.md
+│
+├── # Frontend
+├── react-component-builder/SKILL.md
+├── state-management/SKILL.md
+├── product-discovery-ui/SKILL.md
+├── cart-checkout-ui/SKILL.md
+├── gamification-ui/SKILL.md
+├── admin-seller-portal/SKILL.md
+│
+├── # Cross-cutting
+├── error-handling/SKILL.md
+├── testing-workflows/SKILL.md
+├── deployment-cicd/SKILL.md
+├── security-hardening/SKILL.md
+├── logging-observability/SKILL.md
+├── performance-optimization/SKILL.md
+│
+└── # Workflow
+    ├── git-workflow/SKILL.md
+    └── coding-standards/SKILL.md
 ```
 
-Once present, Claude reads each `SKILL.md`'s frontmatter (`name`, `description`) and
-invokes the skill body when your prompt matches the triggers described in the description.
-
-## What's included (28 skills)
-
-### Frontend (React) — 5
-| Skill | Use when |
-| --- | --- |
-| `react-component-builder` | Creating any React component — cards, modals, forms, layouts |
-| `product-discovery-ui` | Home feed, search, filters, PDP, infinite scroll |
-| `cart-checkout-ui` | Cart drawer, checkout steps, payment form |
-| `gamification-ui` | Spin wheel, daily rewards, mini-games, flash sales, referrals |
-| `state-management` | TanStack Query, Zustand, URL state — "where should this live?" |
-
-### Backend (FastAPI) — 5
-| Skill | Use when |
-| --- | --- |
-| `fastapi-endpoint-builder` | Adding routes, routers, middleware, dependencies |
-| `auth-jwt` | Login, register, JWT, refresh tokens, social login, OTP |
-| `payment-integration` | Stripe / PayPal / Apple Pay, webhooks, refunds, 3DS |
-| `order-management` | Order lifecycle, inventory locking, returns, fulfillment |
-| `pydantic-schemas` | Request/response models, validation, OpenAPI shapes |
-
-### Database & Infrastructure — 4
-| Skill | Use when |
-| --- | --- |
-| `postgres-schema` | Tables, migrations (Alembic), indexes, FKs |
-| `redis-caching` | Cache, rate limit, idempotency, OTP, hot-SKU counters |
-| `media-storage` | S3 / Cloudinary uploads, image variants, CDN, video |
-| `search-indexing` | Postgres FTS → Meilisearch/OpenSearch, ranking, facets |
-
-### DevOps, Testing & Security — 4
-| Skill | Use when |
-| --- | --- |
-| `testing-workflows` | pytest, Vitest/RTL, Playwright, CI test setup |
-| `deployment-cicd` | Dockerfiles, GitHub Actions, environments, releases |
-| `security-review` | OWASP Top 10, auth, payments, PII, PCI, secrets |
-| `performance-optimization` | Slow endpoints, N+1, LCP/INP, bundle size, capacity |
-
-### Git, PR & LLM Cost — 3
-| Skill | Use when |
-| --- | --- |
-| `git-workflow` | Branching, conventional commits, rebasing, recovery |
-| `pr-review-merge` | PR templates, review rubric, merge gates, CODEOWNERS |
-| `token-optimizer` | Cut LLM cost — caching, RAG, model selection, structured output |
-
-### Engineering Hygiene — 4
-| Skill | Use when |
-| --- | --- |
-| `code-review` | Reading code thoughtfully — what to flag, how to comment |
-| `debugging-workflow` | Reproduce → isolate → hypothesize → test → fix |
-| `error-handling` | Typed exceptions, error envelope, retries, timeouts |
-| `logging-monitoring` | Structured logs, Sentry, OpenTelemetry, dashboards, SLOs |
-
-### Operator-facing Surfaces — 3
-| Skill | Use when |
-| --- | --- |
-| `admin-seller-portal` | Admin panel, seller portal, RBAC, audit log |
-| `notifications-system` | Email, SMS, push, in-app — templates, prefs, deliverability |
-| `api-documentation` | OpenAPI, ADRs, READMEs, changelog |
+22 skills, grouped into four buckets. Most non-trivial tasks span 2–3 of them.
 
 ## How Claude uses these
 
-1. You ask Claude to do something (e.g., "add a `/cart/items` endpoint that supports variants").
-2. Claude scans the skill descriptions in the frontmatter, sees that
-   `fastapi-endpoint-builder`, `pydantic-schemas`, and possibly `redis-caching` apply.
-3. Claude reads the SKILL.md bodies for those skills and follows the patterns inside.
+1. You ask Claude to do something (e.g. *"add a coupon endpoint that validates against active campaigns"*).
+2. Claude reads the frontmatter description on every `SKILL.md` and picks the ones that match — typically 2–3 per task.
+3. Claude then reads the matched bodies and follows the conventions inside.
+
+You can also invoke a skill manually via `/<skill-name>` if you want Claude to apply a specific playbook.
 
 ## Customizing
 
-Each `SKILL.md` is two parts:
+Each `SKILL.md` has two parts:
 
-- **YAML frontmatter** at the top — `name` and `description` decide *when* the skill triggers.
-  Edit the description to bias toward or away from triggering.
-- **Markdown body** — the actual playbook Claude follows. Edit freely to match your
-  team's conventions, libraries, or naming.
+- **Frontmatter** — `name` and `description`. The description is the trigger; edit it to bias loading.
+- **Body** — the actual playbook. Edit freely to match team conventions, new libraries, or renamed paths.
 
-If you change a stack choice (e.g., switch from Vite to Next.js, or Stripe to Razorpay),
-update the relevant skill body so Claude doesn't keep applying the old pattern.
+When you change a stack choice (e.g., swap Stripe for Razorpay, or Vite for Next.js), update the relevant skill bodies so Claude stops applying the old pattern.
 
 ## Adding new skills
 
-Create a new folder with a `SKILL.md` inside:
+Create a new folder with a `SKILL.md`:
 
 ```
 .claude/skills/
@@ -114,33 +80,34 @@ Frontmatter template:
 ```yaml
 ---
 name: your-new-skill
-description: One sentence about what the skill does + the triggers (keywords/phrases)
-  that should make Claude pick it up. Be specific — this is the only thing Claude
-  sees when deciding whether to load the skill.
+description: One precise sentence covering what the skill does + the trigger phrases that should make Claude pick it up. Specificity wins — vague descriptions trigger too often or not at all.
 ---
 ```
 
-Then write the body the way you'd write a teammate's onboarding doc: principles,
-templates, patterns, anti-patterns, and a checklist.
+Body structure that tends to work:
 
-## Suggested order of work
+- **When this skill applies** — explicit list, so Claude doesn't over-trigger.
+- **Architecture / conventions** — the patterns used in this project specifically.
+- **Code examples** — concrete and matching the actual file paths.
+- **Common mistakes to flag** — the failure modes you keep catching in PR review.
+- **Checklist** — the "definition of done" for work in this area.
 
-If you're starting the project from scratch, a sane sequence:
+Then add a one-liner to `INDEX.md` so humans can find it too.
 
-1. `git-workflow` + `pr-review-merge` — set the workflow before code lands.
-2. `postgres-schema` — lock the data model first.
-3. `pydantic-schemas` + `fastapi-endpoint-builder` — basic CRUD on products/users.
-4. `auth-jwt` — login/register, gate the rest.
+## Suggested order of work (greenfield to launch)
+
+1. `git-workflow` + `coding-standards` — set the lane lines before any code lands.
+2. `postgres-schema` — lock the data model.
+3. `api-contract-builder` + `fastapi-endpoint-builder` — basic CRUD on products / users.
+4. `auth-jwt` — login/register, gate everything else.
 5. `react-component-builder` + `state-management` — frontend skeleton.
-6. `product-discovery-ui` — make the catalog browsable.
-7. `media-storage` — product images live somewhere.
+6. `product-discovery-ui` + `embeddings-search` — make the catalog browsable.
+7. `media-storage` — product images.
 8. `cart-checkout-ui` + `order-management` — the buying path.
 9. `payment-integration` — actually take money.
-10. `error-handling` + `logging-monitoring` — wire telemetry early, not at launch.
-11. `redis-caching` + `search-indexing` — performance and discovery once it's working.
-12. `notifications-system` — order receipts, shipping updates.
-13. `admin-seller-portal` — once you have orders to manage.
-14. `gamification-ui` — once core retention is solid.
-15. `testing-workflows`, `deployment-cicd`, `security-review`, `performance-optimization`,
-    `debugging-workflow`, `code-review`, `api-documentation`, `token-optimizer` —
-    ongoing, weave in throughout, not at the end.
+10. `error-handling` + `logging-observability` — wire the envelope, request-IDs, and Sentry end-to-end.
+11. `security-hardening` — close OWASP-relevant gaps before any user touches it.
+12. `admin-seller-portal` — operate the marketplace.
+13. `gamification-ui` — retention surface (quests, flash sales, spin wheel).
+14. `performance-optimization` — measure, then trim — bias toward the routes users actually hit.
+15. `testing-workflows` + `deployment-cicd` — weave in throughout, not at the end.

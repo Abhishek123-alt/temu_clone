@@ -251,8 +251,6 @@ def read_recently_viewed(
 ):
     return product_services.get_recently_viewed(db, current_user.id, limit)
 
-from app.modules.quest import services as quest_services
-
 @router.post("/recently-viewed/{product_id}")
 def add_to_recently_viewed(
     product_id: UUID,
@@ -260,5 +258,4 @@ def add_to_recently_viewed(
     current_user: models.User = Depends(get_current_user)
 ):
     product_services.add_to_recently_viewed(db, current_user.id, product_id)
-    quest_services.update_quest_progress(db, current_user.id, "PRODUCT_VIEW")
     return {"status": "success"}

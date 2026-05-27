@@ -1,26 +1,61 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, Target, CheckCircle2, Circle } from 'lucide-react';
 import api from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { toast } from '../../utils/toast';
 
 const QuestsPage = () => {
   const { user, setUser } = useAuthStore();
   const [quests, setQuests] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Tracks completed quest IDs *as last observed by this component*. Used to
+  // detect a fresh completion between polls so we can refresh the user object
+  // (so the new Reward shows up in the navbar / profile / checkout).
+  const completedIdsRef = useRef(new Set());
+  // The very first fetch on mount just seeds the snapshot of "what was
+  // already completed before this page opened". We must NOT toast for those
+  // quests — the reward was granted earlier in the session/previous session,
+  // not just now.
+  const hasSeededRef = useRef(false);
 
   useEffect(() => {
+    const refreshUser = async () => {
+      try {
+        const res = await api.get('/user/me');
+        setUser(res.data);
+      } catch (err) {
+        console.error('Failed to refresh user after quest completion:', err);
+      }
+    };
+
     const fetchQuests = async () => {
       try {
         const res = await api.get('/quests/my-progress');
         setQuests(res.data);
+
+        const seen = completedIdsRef.current;
+        const newlyCompleted = res.data.filter(
+          (q) => q.is_completed && !seen.has(q.quest_id),
+        );
+        res.data.forEach((q) => {
+          if (q.is_completed) seen.add(q.quest_id);
+        });
+        // Only toast for completions discovered *after* the initial snapshot.
+        if (hasSeededRef.current && newlyCompleted.length > 0) {
+          newlyCompleted.forEach((q) => {
+            toast.success(`Quest complete: ${q.title} → ${q.reward_value} reward!`);
+          });
+          refreshUser();
+        }
+        hasSeededRef.current = true;
       } catch (error) {
         console.error('Failed to fetch quests:', error);
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchQuests();
 
     // Set up real-time polling (every 5 seconds)
@@ -29,6 +64,7 @@ const QuestsPage = () => {
     }, 5000);
 
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loading) {

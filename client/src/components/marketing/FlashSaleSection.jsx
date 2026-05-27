@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Timer, Zap, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '../../services/api';
 import ProductCard from '../products/ProductCard';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const FlashSaleSection = () => {
+  const { t } = useTranslation();
   const [sales, setSales] = useState([]);
   const [activeSaleIndex, setActiveSaleIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -53,7 +55,7 @@ const FlashSaleSection = () => {
       const now = new Date();
       const diff = end - now;
       if (diff <= 0) {
-        setTimeLeft('EXPIRED');
+        setTimeLeft(t('flash.expired'));
         // Refresh sales to remove the expired one
         fetchSales();
         return;
@@ -106,7 +108,7 @@ const FlashSaleSection = () => {
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12 relative z-10">
             <div className="space-y-4">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-red-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse">
-                <Timer size={14} /> Flash Sale Live
+                <Timer size={14} /> {t('flash.live')}
               </div>
               <h2 className="text-4xl md:text-6xl font-black text-gray-900 tracking-tight">{currentSale.name}</h2>
               <p className="text-xl text-gray-600 font-medium max-w-2xl">{currentSale.description}</p>
@@ -114,7 +116,7 @@ const FlashSaleSection = () => {
 
             <div className="flex flex-col items-center md:items-end">
               <div className="bg-white px-8 py-5 rounded-[32px] shadow-xl shadow-red-100/50 border border-red-100 flex flex-col items-center">
-                <span className="text-[10px] font-black uppercase text-red-500 tracking-widest mb-1">Offer Ends In</span>
+                <span className="text-[10px] font-black uppercase text-red-500 tracking-widest mb-1">{t('flash.ends_in')}</span>
                 <span className="text-4xl font-black text-gray-900 tabular-nums">{timeLeft}</span>
               </div>
             </div>
