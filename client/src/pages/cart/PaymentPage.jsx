@@ -20,7 +20,7 @@ const PaymentPage = () => {
 
   const handlePayment = async (e) => {
     e.preventDefault();
-    
+
     // Validate if UPI is being used
     if (!paymentMethod && !upiId.includes('@')) {
       return toast.error("Please enter a valid UPI ID (e.g., user@upi)");
@@ -29,32 +29,36 @@ const PaymentPage = () => {
     setProcessing(true);
     // Simulate payment processing
     setTimeout(async () => {
+      // Step 1 — create the order. If this fails, nothing was persisted.
+      let orderId;
       try {
-        // 1. Create the actual order now that payment is "done"
         const response = await api.post('/orders/', checkoutDetails);
-        const orderId = response.data.id;
+        orderId = response.data.id;
+      } catch (error) {
+        console.error("Order creation failed:", error);
+        const detail = error?.response?.data?.detail;
+        toast.error(typeof detail === 'string' ? detail : "Could not place order. Please try again.");
+        setProcessing(false);
+        return;
+      }
 
-        // 2. Update the order status to PAID in the backend
-        await api.put(`/orders/${orderId}/status`, { status: 'paid' }); 
-        
-        // 3. Clear frontend cart
-        clearCart();
-
-        // 4. Refresh User Data (for coupons used)
+      // Step 2 — best-effort post-order updates. The order already exists,
+      // so any failure here must NOT block the user from landing on /orders.
+      try {
+        await api.put(`/orders/${orderId}/status`, { status: 'paid' });
         const userRes = await api.get('/user/me');
         setUser(userRes.data);
-        
-        setSuccess(true);
-        toast.success("Payment successful!");
-        setTimeout(() => {
-          navigate('/orders');
-        }, 2000);
       } catch (error) {
-        console.error("Payment flow failed:", error);
-        toast.error("Order creation failed after payment. Please contact support.");
-      } finally {
-        setProcessing(false);
+        console.warn("Post-order updates failed (order is still placed):", error);
       }
+
+      clearCart();
+      setSuccess(true);
+      toast.success("Payment successful!");
+      setTimeout(() => {
+        navigate('/orders');
+      }, 2000);
+      setProcessing(false);
     }, 2000);
   };
 

@@ -264,7 +264,7 @@ const OrderDetailPage = () => {
                 <MapPin size={16} className="text-[#fb7701]" /> Delivery Address
               </h3>
               <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100">
-                <p className="text-sm text-gray-700 font-medium leading-relaxed">
+                <p className="text-sm text-gray-700 font-medium leading-relaxed whitespace-pre-line">
                   {order.shipping_address}
                 </p>
               </div>

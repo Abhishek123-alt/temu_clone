@@ -3,29 +3,31 @@ import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, Megaphone, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const MarketingCarousel = () => {
+  const { t } = useTranslation();
   const [banners, setBanners] = useState([
     {
       id: '1',
-      title: 'Mega Summer Sale!',
-      description: 'Up to 70% OFF on all electronics. Limited time only!',
+      titleKey: 'carousel.banner1_title',
+      descKey: 'carousel.banner1_desc',
       image: 'https://images.unsplash.com/photo-1498049796873-ba26082ele-123',
       link: '/deals',
       color: 'bg-orange-500'
     },
     {
       id: '2',
-      title: 'New Arrivals',
-      description: 'Fresh styles for the new season. Explore now.',
+      titleKey: 'carousel.banner2_title',
+      descKey: 'carousel.banner2_desc',
       image: 'https://images.unsplash.com/photo-1441986300917-64674bd30ad6',
       link: '/new-arrivals',
       color: 'bg-blue-500'
     },
     {
       id: '3',
-      title: 'Join the Club',
-      description: 'Get exclusive rewards and early access to deals.',
+      titleKey: 'carousel.banner3_title',
+      descKey: 'carousel.banner3_desc',
       image: 'https://images.unsplash.com/photo-1556742044-177767391c2d',
       link: '/profile/quests',
       color: 'bg-purple-500'
@@ -58,25 +60,25 @@ const MarketingCarousel = () => {
         >
           <div className="relative z-10 text-center md:text-left max-w-2xl space-y-6">
             <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest">
-              <Sparkles size={14} /> Limited Offer
+              <Sparkles size={14} /> {t('carousel.limited_offer')}
             </div>
             <h2 className="text-4xl md:text-7xl font-black leading-tight">
-              {banners[currentIndex].title}
+              {t(banners[currentIndex].titleKey)}
             </h2>
             <p className="text-lg md:text-xl font-medium opacity-90 max-w-md">
-              {banners[currentIndex].description}
+              {t(banners[currentIndex].descKey)}
             </p>
             <button
               onClick={() => navigate(banners[currentIndex].link)}
               className="bg-white text-gray-900 px-8 py-4 rounded-full font-black text-lg hover:scale-105 transition-transform shadow-xl"
             >
-              Shop Now
+              {t('carousel.shop_now')}
             </button>
           </div>
           <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent pointer-events-none" />
           <img
             src={banners[currentIndex].image}
-            alt={banners[currentIndex].title}
+            alt={t(banners[currentIndex].titleKey)}
             className="absolute inset-0 w-full h-full object-cover opacity-40 pointer-events-none"
           />
         </motion.div>

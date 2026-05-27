@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
 import api from '../../services/api';
 
-const ReviewList = ({ productId }) => {
+const ReviewList = ({ productId, onStats }) => {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -10,18 +10,24 @@ const ReviewList = ({ productId }) => {
     const fetchReviews = async () => {
       if (!productId) return;
       try {
-        console.log(`🔍 Fetching reviews for product: ${productId}`);
         const response = await api.get(`/reviews/product/${productId}`);
-        console.log(`✅ Received ${response.data.length} reviews`);
         setReviews(response.data);
+        if (onStats) {
+          const count = response.data.length;
+          const average = count
+            ? response.data.reduce((sum, r) => sum + r.rating, 0) / count
+            : 0;
+          onStats({ count, average });
+        }
       } catch (error) {
-        console.error("❌ Failed to fetch reviews:", error);
+        console.error("Failed to fetch reviews:", error);
+        if (onStats) onStats({ count: 0, average: 0 });
       } finally {
         setLoading(false);
       }
     };
     fetchReviews();
-  }, [productId]);
+  }, [productId, onStats]);
 
   return (
     <div className="space-y-12">

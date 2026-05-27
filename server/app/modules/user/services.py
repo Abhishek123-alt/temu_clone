@@ -75,12 +75,27 @@ def get_user_addresses(db: Session, user_id: UUID):
     return db.query(models.Address).filter(models.Address.user_id == user_id).all()
 
 def delete_address(db: Session, user_id: UUID, address_id: UUID):
+    from fastapi import HTTPException
     db_address = db.query(models.Address).filter(models.Address.id == address_id, models.Address.user_id == user_id).first()
-    if db_address:
-        db.delete(db_address)
-        db.commit()
-        return True
-    return False
+    if not db_address:
+        return False
+
+    # If this is the default and the user has other addresses, require them
+    # to promote another one to default first.
+    if db_address.is_default:
+        other_count = db.query(models.Address).filter(
+            models.Address.user_id == user_id,
+            models.Address.id != address_id,
+        ).count()
+        if other_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete default address. Set another address as default first.",
+            )
+
+    db.delete(db_address)
+    db.commit()
+    return True
 
 def add_payment_method(db: Session, user_id: UUID, payment_in: schemas.PaymentMethodCreate):
     from fastapi import HTTPException

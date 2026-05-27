@@ -9,6 +9,8 @@ from app.modules.flash_sale.router import router as flash_sale_router
 from app.modules.quest.router import router as quest_router
 from app.modules.review.router import router as review_router
 from app.modules.store.router import router as store_router
+from app.modules.support.router import router as support_router
+from app.modules.gamification.router import router as gamification_router
 
 api_router = APIRouter()
 
@@ -22,3 +24,5 @@ api_router.include_router(flash_sale_router, prefix="/flash-sales", tags=["flash
 api_router.include_router(quest_router, prefix="/quests", tags=["quests"])
 api_router.include_router(review_router, prefix="/reviews", tags=["reviews"])
 api_router.include_router(store_router, prefix="/store", tags=["store"])
+api_router.include_router(support_router, prefix="/support", tags=["support"])
+api_router.include_router(gamification_router, prefix="/gamification", tags=["gamification"])

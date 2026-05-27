@@ -4,6 +4,7 @@ from uuid import UUID
 from datetime import datetime
 
 class AddressBase(BaseModel):
+    name: Optional[str] = None
     street: str
     city: str
     state: str

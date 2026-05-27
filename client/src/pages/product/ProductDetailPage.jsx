@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { productService } from '../../services/productService';
 import { userService } from '../../services/userService';
@@ -16,8 +16,18 @@ const ProductDetailPage = () => {
   const [adding, setAdding] = useState(false);
   const [success, setSuccess] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState({});
+  const [reviewStats, setReviewStats] = useState({ count: 0, average: 0 });
   const { addToCart } = useCartStore();
   const { toggleWishlist, isInWishlist } = useWishlistStore();
+
+  const handleReviewStats = useCallback((stats) => {
+    setReviewStats(stats);
+  }, []);
+
+  // React StrictMode double-invokes effects in dev. Without this guard the
+  // PDP would POST /recently-viewed twice in parallel for the same product,
+  // racing the quest progress counter on the server.
+  const recordedViewIds = useRef(new Set());
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -38,7 +48,10 @@ const ProductDetailPage = () => {
           setSelectedOptions(initialOptions);
         }
 
-        userService.addToRecentlyViewed(data.id).catch(err => console.error("Failed to record view", err));
+        if (!recordedViewIds.current.has(data.id)) {
+          recordedViewIds.current.add(data.id);
+          userService.addToRecentlyViewed(data.id).catch(err => console.error("Failed to record view", err));
+        }
       } catch (error) {
         console.error('Failed to fetch product:', error);
       } finally {
@@ -78,7 +91,13 @@ const ProductDetailPage = () => {
     }
     setAdding(true);
     try {
-      await addToCart(product.id, currentVariant?.id, quantity);
+      await addToCart(product.id, currentVariant?.id, quantity, {
+        id: product.id,
+        title: product.title,
+        slug: product.slug,
+        price: displayPrice,
+        images: product.images || [],
+      });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (error) {
@@ -121,12 +140,21 @@ const ProductDetailPage = () => {
           <h1 className="text-4xl font-extrabold text-gray-900 leading-tight mb-4">{product.title}</h1>
           
           <div className="flex items-center gap-4 mb-8">
-            <div className="flex items-center gap-1 bg-yellow-50 px-3 py-1 rounded-full">
-              <Star size={16} className="text-yellow-400" fill="currentColor" />
-              <span className="font-bold text-yellow-700">{product.rating}</span>
-            </div>
-            <span className="text-gray-400 font-medium">{product.review_count} Reviews</span>
-            <span className="text-gray-200">|</span>
+            {reviewStats.count > 0 ? (
+              <>
+                <div className="flex items-center gap-1 bg-yellow-50 px-3 py-1 rounded-full">
+                  <Star size={16} className="text-yellow-400" fill="currentColor" />
+                  <span className="font-bold text-yellow-700">{reviewStats.average.toFixed(1)}</span>
+                </div>
+                <span className="text-gray-400 font-medium">{reviewStats.count} {reviewStats.count === 1 ? 'Review' : 'Reviews'}</span>
+                <span className="text-gray-200">|</span>
+              </>
+            ) : (
+              <>
+                <span className="text-gray-400 font-medium">No reviews yet</span>
+                <span className="text-gray-200">|</span>
+              </>
+            )}
             <span className="text-green-600 font-bold">In Stock</span>
           </div>
 
@@ -185,14 +213,16 @@ const ProductDetailPage = () => {
               </button>
             </div>
 
-            <button 
+            <button
               onClick={handleAddToCart}
-              disabled={adding}
+              disabled={adding || (typeof product.stock === 'number' && product.stock <= 0)}
               className={`flex-1 btn-primary py-5 text-xl flex items-center justify-center gap-3 transition-all ${
                 success ? 'bg-green-500 border-green-500' : ''
-              }`}
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              {adding ? (
+              {typeof product.stock === 'number' && product.stock <= 0 ? (
+                'Out of Stock'
+              ) : adding ? (
                 <span className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></span>
               ) : success ? (
                 <><Check size={24} /> Added to Cart</>
@@ -233,7 +263,7 @@ const ProductDetailPage = () => {
 
       {/* Reviews Section - Outside the grid for full width */}
       <div className="pt-16 border-t border-gray-100">
-        <ReviewList productId={product.id} />
+        <ReviewList productId={product.id} onStats={handleReviewStats} />
       </div>
     </div>
   );

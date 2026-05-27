@@ -9,6 +9,13 @@ export const authService = {
     const response = await api.post('/auth/login', credentials);
     return response.data;
   },
+  loginWithGoogle: async ({ credential, referralCode } = {}) => {
+    const response = await api.post('/auth/google', {
+      credential,
+      referral_code: referralCode || null,
+    });
+    return response.data;
+  },
   getMe: async () => {
     const response = await api.get('/user/me');
     return response.data;

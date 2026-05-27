@@ -7,17 +7,16 @@ import { Gift, Zap, Star, Sparkles } from 'lucide-react';
 import SpinWheel from '../../components/gamification/SpinWheel';
 import MarketingCarousel from '../../components/marketing/MarketingCarousel';
 import FlashSaleSection from '../../components/marketing/FlashSaleSection';
-import CategoryRail from '../../components/products/CategoryRail';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const HomePage = () => {
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isWheelOpen, setIsWheelOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
-  const activeCategoryId = queryParams.get('category_id');
+  const { t } = useTranslation();
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -26,14 +25,9 @@ const HomePage = () => {
         const search = queryParams.get('search') || '';
         const category_id = queryParams.get('category_id');
         const new_arrivals = queryParams.get('new_arrivals') === 'true';
-        
-        const [productsData, categoriesData] = await Promise.all([
-          productService.getProducts(0, 50, search, false, false, category_id, new_arrivals),
-          productService.getCategories()
-        ]);
-        
+
+        const productsData = await productService.getProducts(0, 50, search, false, false, category_id, new_arrivals);
         setProducts(productsData);
-        setCategories(categoriesData);
       } catch (error) {
         console.error('Failed to fetch data:', error);
       } finally {
@@ -61,16 +55,10 @@ const HomePage = () => {
       {/* Flash Sale Section */}
       <FlashSaleSection />
 
-      <CategoryRail 
-        categories={categories} 
-        activeCategoryId={activeCategoryId} 
-      />
-
-      <div id="product-feed" className="mb-8 flex items-center justify-between scroll-mt-40">
+      <div id="product-feed" className="mb-8 scroll-mt-40">
         <h2 className="text-2xl font-extrabold text-gray-900">
-          {queryParams.get('new_arrivals') === 'true' ? 'New Arrivals' : 'Recommended for You'}
+          {queryParams.get('new_arrivals') === 'true' ? t('home.new_arrivals') : t('home.recommended')}
         </h2>
-        <a href="#" className="text-[#fb7701] font-bold hover:underline">View All</a>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -82,13 +70,15 @@ const HomePage = () => {
       {products.length === 0 && (
         <div className="text-center py-20">
           <p className="text-xl font-bold text-gray-400">
-            {queryParams.get('search') ? `No products found matching "${queryParams.get('search')}"` : 'No products found matching your criteria.'}
+            {queryParams.get('search')
+              ? t('home.no_products_search', { query: queryParams.get('search') })
+              : t('home.no_products_default')}
           </p>
           <button
             onClick={() => navigate('/')}
             className="text-[#fb7701] font-bold mt-4 hover:underline"
           >
-            Clear all filters
+            {t('home.clear_filters')}
           </button>
         </div>
       )}
@@ -101,7 +91,7 @@ const HomePage = () => {
         className="fixed bottom-8 right-8 w-20 h-20 bg-[#fb7701] text-white rounded-full shadow-2xl shadow-orange-500/40 flex flex-col items-center justify-center z-50 border-4 border-white group"
       >
         <Gift className="group-hover:animate-bounce" size={28} />
-        <span className="text-[10px] font-black uppercase tracking-tighter mt-1">Spin & Win</span>
+        <span className="text-[10px] font-black uppercase tracking-tighter mt-1">{t('home.spin_win')}</span>
         <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white">1</div>
       </motion.button>
 

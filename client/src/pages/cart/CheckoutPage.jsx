@@ -7,12 +7,28 @@ import { CreditCard, MapPin, ShieldCheck, ArrowRight, Loader2, Gift, Trash2, Ale
 import { toast } from '../../utils/toast';
 import api from '../../services/api';
 
+const EMPTY_ADDRESS = { name: '', street: '', city: '', state: '', zip: '', country: 'India', is_default: false };
+
+const formatAddress = (addr) => {
+  if (!addr) return '';
+  const parts = [
+    addr.name,
+    addr.street,
+    [addr.city, addr.state, addr.zip].filter(Boolean).join(', '),
+    addr.country,
+  ].filter(Boolean);
+  return parts.join('\n');
+};
+
 const CheckoutPage = () => {
-  const { items, clearCart } = useCartStore();
+  const { items, clearCart, fetchCart } = useCartStore();
   const { user, setUser } = useAuthStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [address, setAddress] = useState(user?.addresses?.[0]?.street || '');
+  const defaultSaved = user?.addresses?.find(a => a.is_default) || user?.addresses?.[0] || null;
+  const [selectedAddressId, setSelectedAddressId] = useState(defaultSaved?.id || null);
+  const [newAddress, setNewAddress] = useState({ ...EMPTY_ADDRESS, name: user?.full_name || '' });
+  const [showNewAddressForm, setShowNewAddressForm] = useState(!defaultSaved);
   const [selectedReward, setSelectedReward] = useState(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(user?.payment_methods?.find(p => p.is_default) || user?.payment_methods?.[0] || null);
   const [showNewCardForm, setShowNewCardForm] = useState(false);
@@ -20,9 +36,35 @@ const CheckoutPage = () => {
   const [addingCard, setAddingCard] = useState(false);
   const [addressToDelete, setAddressToDelete] = useState(null);
 
+  // Track cart item IDs the user has *explicitly* unchecked. Derived selection
+  // = (every cart item) minus (excluded) minus (out-of-stock). Excluding rather
+  // than including avoids the need to sync state with the cart inside an effect.
+  const [excludedItemIds, setExcludedItemIds] = useState(() => new Set());
+
   const confirmDeleteAddress = (e, addressId) => {
     e.stopPropagation();
     setAddressToDelete(addressId);
+  };
+
+  const handleSetDefault = async (e, addr) => {
+    e.stopPropagation();
+    try {
+      await api.put(`/user/addresses/${addr.id}`, {
+        name: addr.name || '',
+        street: addr.street,
+        city: addr.city,
+        state: addr.state,
+        zip: addr.zip,
+        country: addr.country,
+        is_default: true,
+      });
+      const userRes = await api.get('/user/me');
+      setUser(userRes.data);
+      toast.success("Default address updated");
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : "Failed to update default address");
+    }
   };
 
   const handleDeleteAddress = async () => {
@@ -32,14 +74,18 @@ const CheckoutPage = () => {
       const userRes = await api.get('/user/me');
       setUser(userRes.data);
       toast.success("Address removed");
-      
-      // If we deleted the currently selected address, clear it
-      if (address === user?.addresses?.find(a => a.id === addressToDelete)?.street) {
-        setAddress('');
+
+      // If we deleted the currently selected address, clear selection
+      if (selectedAddressId === addressToDelete) {
+        const next = userRes.data.addresses?.find(a => a.is_default) || userRes.data.addresses?.[0] || null;
+        setSelectedAddressId(next?.id || null);
+        if (!next) setShowNewAddressForm(true);
       }
-      addressToDelete(null);
+      setAddressToDelete(null);
     } catch (err) {
-      toast.error("Failed to remove address");
+      const detail = err?.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : "Failed to remove address");
+      setAddressToDelete(null);
     }
   };
 
@@ -51,12 +97,21 @@ const CheckoutPage = () => {
         if (!selectedPaymentMethod && res.data.payment_methods?.length > 0) {
           setSelectedPaymentMethod(res.data.payment_methods.find(p => p.is_default) || res.data.payment_methods[0]);
         }
+        if (!selectedAddressId && res.data.addresses?.length > 0) {
+          const next = res.data.addresses.find(a => a.is_default) || res.data.addresses[0];
+          setSelectedAddressId(next.id);
+          setShowNewAddressForm(false);
+        }
+        setNewAddress(prev => prev.name ? prev : { ...prev, name: res.data.full_name || '' });
       } catch (err) {
         console.error("Failed to refresh user data", err);
       }
     };
     fetchUser();
-  }, [setUser, selectedPaymentMethod]);
+    // Refresh the cart so stock numbers are current before the user pays
+    fetchCart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAddCard = async (e) => {
     e.preventDefault();
@@ -77,16 +132,41 @@ const CheckoutPage = () => {
     }
   };
 
-  const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const shipping = 9.99; // Flat shipping rate to make "Free Shipping" coupons more valuable
+  const stockIssue = (item) => {
+    const stock = item.product?.stock;
+    if (typeof stock !== 'number') return null;
+    if (stock <= 0) return { kind: 'out', stock };
+    if (item.quantity > stock) return { kind: 'low', stock };
+    return null;
+  };
+  const outOfStockItems = items.filter((item) => stockIssue(item));
+  const isItemSelected = (item) => !stockIssue(item) && !excludedItemIds.has(item.id);
+  const selectedItems = items.filter(isItemSelected);
+  const unselectedInStockCount = items.filter(
+    (item) => !stockIssue(item) && excludedItemIds.has(item.id),
+  ).length;
+  const isPartialOrder = selectedItems.length < items.length;
+
+  const toggleItem = (item) => {
+    if (stockIssue(item)) return; // OOS can't be selected
+    setExcludedItemIds(prev => {
+      const next = new Set(prev);
+      if (next.has(item.id)) next.delete(item.id);
+      else next.add(item.id);
+      return next;
+    });
+  };
+
+  const subtotal = selectedItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const shipping = selectedItems.length > 0 ? 9.99 : 0; // Flat shipping rate
   const tax = subtotal * 0.08;
-  
-  // Calculate Discount
+
+  // Calculate Discount over the selected items only
   let discount = 0;
-  if (selectedReward) {
+  if (selectedReward && selectedItems.length > 0) {
     // Robustly extract numeric value (handles "$10", "10%", "10 Credits", etc.)
     const numericValue = parseFloat(selectedReward.value.replace(/[^0-9.]/g, '')) || 0;
-    
+
     if (selectedReward.reward_type === 'coupon') {
       discount = (subtotal * numericValue) / 100;
     } else if (selectedReward.reward_type === 'credit') {
@@ -94,58 +174,110 @@ const CheckoutPage = () => {
     } else if (selectedReward.reward_type === 'freeship' || selectedReward.reward_type === 'freeship') {
       discount = shipping;
     } else if (selectedReward.reward_type === 'bogo') {
-      const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+      const totalQuantity = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
       if (totalQuantity >= 2) {
-        // Find the price of the cheapest item in the cart to make it "free"
-        const prices = items.map(item => item.product.price);
+        const prices = selectedItems.map(item => item.product.price);
         discount = Math.min(...prices);
       } else {
-        // BOGO requires at least two items to be valid
         discount = 0;
       }
     } else if (selectedReward.reward_type === 'gift') {
-      // For "Free Gift", we'll apply a flat $10 discount as a placeholder 
-      // representing the value of the free gift added to the order.
-      discount = Math.min(subtotal, 10); 
+      discount = Math.min(subtotal, 10);
     } else {
-      // Fallback for other types that might be numeric
       discount = numericValue;
     }
   }
 
-  const total = Math.max(0, subtotal + shipping + tax - discount);
+  // Platform fee must mirror the backend exactly (see services.create_order):
+  //   pre_fee_total = max(0, subtotal + shipping + tax − discount)
+  //   platform_fee  = round(0.30 + 0.02 × pre_fee_total, 2)
+  //   total         = pre_fee_total + platform_fee
+  // Frontend was previously skipping the fee and silently undercharging in the
+  // UI while the server added it on top of what the customer saw.
+  const preFeeTotal = Math.max(0, subtotal + shipping + tax - discount);
+  const platformFee = selectedItems.length > 0
+    ? Math.round((0.30 + 0.02 * preFeeTotal) * 100) / 100
+    : 0;
+  const total = Math.round((preFeeTotal + platformFee) * 100) / 100;
+
+  const validateNewAddress = (addr) => {
+    if (!addr.name.trim()) return "Please enter the recipient's name";
+    if (!addr.street.trim()) return "Please enter your street address";
+    if (!addr.city.trim()) return "Please enter your city";
+    if (!addr.state.trim()) return "Please enter your state";
+    if (!addr.zip.trim()) return "Please enter your zip code";
+    if (!addr.country.trim()) return "Please enter your country";
+    return null;
+  };
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
-    if (!address.trim()) return toast.error("Please enter your shipping address");
+    if (selectedItems.length === 0) {
+      return toast.error("Select at least one item to place an order");
+    }
+    // Validate stock for the items the user is actually ordering
+    const orderingIssue = selectedItems.find((item) => stockIssue(item));
+    if (orderingIssue) {
+      const issue = stockIssue(orderingIssue);
+      return toast.error(
+        issue.kind === 'out'
+          ? `"${orderingIssue.product.title}" is out of stock. Unselect it to continue.`
+          : `Only ${issue.stock} left of "${orderingIssue.product.title}". Reduce the quantity to continue.`
+      );
+    }
     if (!selectedPaymentMethod) return toast.error("Please select or add a payment method");
 
-    // Reward Validation
+    // Resolve the shipping address (either selected saved or new)
+    let shippingAddress;
+    if (showNewAddressForm) {
+      const err = validateNewAddress(newAddress);
+      if (err) return toast.error(err);
+      shippingAddress = newAddress;
+    } else {
+      shippingAddress = user?.addresses?.find(a => a.id === selectedAddressId);
+      if (!shippingAddress) return toast.error("Please select a shipping address");
+    }
+
+    // Reward Validation — BOGO needs 2+ items in *this order*
     if (selectedReward?.reward_type === 'bogo') {
-      const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+      const totalQuantity = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
       if (totalQuantity < 2) {
-        return toast.error("BOGO reward requires at least 2 items in your cart");
+        return toast.error("BOGO reward requires at least 2 selected items");
       }
     }
 
     setLoading(true);
-    // Instead of creating the order now, we navigate to payment with the order details.
-    // The order will be created ONLY after successful payment.
-    setTimeout(() => {
-      setLoading(false);
-      navigate('/payment', { 
-        state: { 
+    try {
+      // If using a new address, persist it first (subject to the 3-address limit)
+      if (showNewAddressForm && (user?.addresses?.length || 0) < 3) {
+        try {
+          await api.post('/user/addresses', newAddress);
+          const userRes = await api.get('/user/me');
+          setUser(userRes.data);
+        } catch (err) {
+          // Saving the address is best-effort; the order still goes through with the typed address.
+          console.warn("Could not save new address to profile", err);
+        }
+      }
+
+      navigate('/payment', {
+        state: {
           amount: total,
           paymentMethod: selectedPaymentMethod,
           checkoutDetails: {
-            shipping_address: address,
+            shipping_address: formatAddress(shippingAddress),
             total_amount: total,
             reward_id: selectedReward ? selectedReward.id : undefined,
-            payment_method_id: selectedPaymentMethod.type === 'upi' ? undefined : selectedPaymentMethod.id
+            payment_method_id: selectedPaymentMethod.type === 'upi' ? undefined : selectedPaymentMethod.id,
+            // Only send the selection when it's a partial order; otherwise the
+            // backend treats null as "order the whole cart".
+            cart_item_ids: isPartialOrder ? selectedItems.map((it) => it.id) : undefined,
           }
-        } 
+        }
       });
-    }, 800);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (items.length === 0) {
@@ -167,29 +299,52 @@ const CheckoutPage = () => {
           <div className="lg:col-span-3 space-y-6">
             {/* Order Items Review */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                Your Items <span className="text-sm font-normal text-gray-400">({items.length})</span>
-              </h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  Your Items <span className="text-sm font-normal text-gray-400">({selectedItems.length}/{items.length})</span>
+                </h2>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Uncheck to keep in cart</p>
+              </div>
               <div className="space-y-4">
-                {items.map((item) => (
-                  <div key={item.product.id} className="flex items-center gap-4 pb-4 border-b border-gray-50 last:border-0 last:pb-0">
+                {items.map((item) => {
+                  const issue = stockIssue(item);
+                  const checked = isItemSelected(item);
+                  return (
+                  <div key={item.product.id} className={`flex items-center gap-4 pb-4 border-b border-gray-50 last:border-0 last:pb-0 ${!checked ? 'opacity-60' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={!!issue}
+                      onChange={() => toggleItem(item)}
+                      className="w-5 h-5 rounded border-gray-300 text-[#fb7701] focus:ring-[#fb7701] disabled:opacity-40 disabled:cursor-not-allowed"
+                    />
                     <div className="w-16 h-16 bg-gray-50 rounded-lg overflow-hidden border border-gray-100 flex-shrink-0">
-                      <img 
-                        src={item.product.images?.[0]?.url || 'https://via.placeholder.com/150'} 
-                        alt={item.product.title} 
-                        className="w-full h-full object-cover"
+                      <img
+                        src={item.product.images?.[0]?.url || 'https://via.placeholder.com/150'}
+                        alt={item.product.title}
+                        className={`w-full h-full object-cover ${issue ? 'grayscale' : ''}`}
                       />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-bold text-gray-900 text-sm truncate">{item.product.title}</h4>
                       <p className="text-xs text-gray-400 mt-1">Quantity: {item.quantity}</p>
+                      {issue && (
+                        <p className="text-[10px] font-black text-red-600 uppercase tracking-wider mt-1 flex items-center gap-1">
+                          <AlertTriangle size={11} />
+                          {issue.kind === 'out' ? 'Out of stock' : `Only ${issue.stock} left`}
+                        </p>
+                      )}
+                      {!issue && !checked && (
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mt-1">Stays in cart</p>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="font-black text-gray-900 text-sm">${(item.product.price * item.quantity).toFixed(2)}</p>
                       <p className="text-[10px] text-gray-400">${item.product.price} each</p>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -202,61 +357,147 @@ const CheckoutPage = () => {
                   </div>
                   <h2 className="text-xl font-bold">Shipping Address</h2>
                 </div>
-                {user?.addresses && user.addresses.length > 0 ? (
-                  user.addresses.length < 3 ? (
-                    <button 
-                      type="button"
-                      onClick={() => setAddress('')}
-                      className="text-xs font-bold text-[#fb7701] hover:underline"
-                    >
-                      + Use New Address
-                    </button>
-                  ) : (
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full">
-                      Max 3 Addresses Reached
-                    </span>
-                  )
-                ) : null}
+                {user?.addresses && user.addresses.length > 0 && user.addresses.length < 3 && !showNewAddressForm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNewAddressForm(true);
+                      setSelectedAddressId(null);
+                      setNewAddress({ ...EMPTY_ADDRESS, name: user?.full_name || '' });
+                    }}
+                    className="text-xs font-bold text-[#fb7701] hover:underline"
+                  >
+                    + Use New Address
+                  </button>
+                )}
+                {user?.addresses && user.addresses.length >= 3 && !showNewAddressForm && (
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full">
+                    Max 3 Addresses Reached
+                  </span>
+                )}
+                {showNewAddressForm && user?.addresses?.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNewAddressForm(false);
+                      const next = user.addresses.find(a => a.is_default) || user.addresses[0];
+                      setSelectedAddressId(next?.id || null);
+                    }}
+                    className="text-xs font-bold text-gray-400 hover:underline"
+                  >
+                    Cancel
+                  </button>
+                )}
               </div>
 
-              {user?.addresses?.length > 0 && !address.startsWith('CUSTOM:') && (
-                <div className="grid grid-cols-1 gap-3 mb-6">
+              {user?.addresses?.length > 0 && !showNewAddressForm && (
+                <div className="grid grid-cols-1 gap-3">
                   {user.addresses.map((addr) => (
-                    <button
+                    <div
                       key={addr.id}
-                      type="button"
-                      onClick={() => setAddress(addr.street)}
-                      className={`text-left p-4 rounded-xl border-2 transition-all relative group ${
-                        address === addr.street 
-                          ? 'border-[#fb7701] bg-orange-50' 
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedAddressId(addr.id)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedAddressId(addr.id); }}
+                      className={`text-left p-4 rounded-xl border-2 transition-all relative group cursor-pointer ${
+                        selectedAddressId === addr.id
+                          ? 'border-[#fb7701] bg-orange-50'
                           : 'border-gray-100 hover:border-gray-200'
                       }`}
                     >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-bold text-sm">{user.full_name}</p>
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-sm">{addr.name || user.full_name}</p>
                           <p className="text-xs text-gray-500 mt-1">{addr.street}</p>
-                          <p className="text-[10px] text-gray-400">{addr.city}, {addr.state} {addr.zip}</p>
+                          <p className="text-[10px] text-gray-400">{addr.city}, {addr.state} {addr.zip}{addr.country ? ` · ${addr.country}` : ''}</p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={(e) => confirmDeleteAddress(e, addr.id)}
-                          className="opacity-0 group-hover:opacity-100 p-2 text-gray-300 hover:text-red-500 transition-all"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {addr.is_default ? (
+                            <span className="text-[9px] bg-green-50 text-green-600 px-2 py-1 rounded-full font-black uppercase tracking-wider">Default</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => handleSetDefault(e, addr)}
+                              className="text-[10px] font-bold text-gray-400 hover:text-[#fb7701] hover:underline"
+                            >
+                              Set as default
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => confirmDeleteAddress(e, addr.id)}
+                            className="opacity-0 group-hover:opacity-100 p-2 text-gray-300 hover:text-red-500 transition-all"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
 
-              <textarea
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Enter your full address (Street, City, Zip, Country)"
-                className="w-full p-4 bg-gray-50 border-gray-200 rounded-xl focus:ring-[#fb7701] focus:border-[#fb7701] min-h-[120px]"
-              />
+              {showNewAddressForm && (
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={newAddress.name}
+                    onChange={(e) => setNewAddress({ ...newAddress, name: e.target.value })}
+                    placeholder="Recipient Name"
+                    className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-[#fb7701] focus:border-[#fb7701]"
+                  />
+                  <input
+                    type="text"
+                    value={newAddress.street}
+                    onChange={(e) => setNewAddress({ ...newAddress, street: e.target.value })}
+                    placeholder="Street Address"
+                    className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-[#fb7701] focus:border-[#fb7701]"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      value={newAddress.city}
+                      onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
+                      placeholder="City"
+                      className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-[#fb7701] focus:border-[#fb7701]"
+                    />
+                    <input
+                      type="text"
+                      value={newAddress.state}
+                      onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })}
+                      placeholder="State"
+                      className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-[#fb7701] focus:border-[#fb7701]"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      value={newAddress.zip}
+                      onChange={(e) => setNewAddress({ ...newAddress, zip: e.target.value })}
+                      placeholder="Zip Code"
+                      className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-[#fb7701] focus:border-[#fb7701]"
+                    />
+                    <input
+                      type="text"
+                      value={newAddress.country}
+                      onChange={(e) => setNewAddress({ ...newAddress, country: e.target.value })}
+                      placeholder="Country"
+                      className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-[#fb7701] focus:border-[#fb7701]"
+                    />
+                  </div>
+                  {(user?.addresses?.length || 0) < 3 && (
+                    <label className="flex items-center gap-3 pt-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newAddress.is_default}
+                        onChange={(e) => setNewAddress({ ...newAddress, is_default: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-[#fb7701] focus:ring-[#fb7701]"
+                      />
+                      <span className="text-xs text-gray-500 font-bold">Save as default address</span>
+                    </label>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Payment Method */}
@@ -469,7 +710,7 @@ const CheckoutPage = () => {
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Order Summary</h2>
             <div className="space-y-4 text-gray-600 font-medium">
               <div className="flex justify-between">
-                <span>Subtotal ({items.length} items)</span>
+                <span>Subtotal ({selectedItems.length} item{selectedItems.length === 1 ? '' : 's'})</span>
                 <span>${subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
@@ -486,21 +727,41 @@ const CheckoutPage = () => {
                   <span>-${discount.toFixed(2)}</span>
                 </div>
               )}
+              <div className="flex justify-between" title="Flat $0.30 + 2% transaction fee — covers payment processing">
+                <span>Platform Fee</span>
+                <span>${platformFee.toFixed(2)}</span>
+              </div>
               <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
                 <span className="text-xl font-bold text-gray-900">Order Total</span>
                 <span className="text-3xl font-black text-[#fb7701]">${total.toFixed(2)}</span>
               </div>
             </div>
+              {outOfStockItems.length > 0 && (
+                <div className="mt-6 bg-amber-50 border border-amber-100 p-3 rounded-lg flex items-start gap-2">
+                  <AlertTriangle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-amber-800 font-bold">
+                    {outOfStockItems.length} unavailable item{outOfStockItems.length === 1 ? '' : 's'} will stay in your cart and won&apos;t be charged.
+                  </p>
+                </div>
+              )}
+              {unselectedInStockCount > 0 && (
+                <div className="mt-3 bg-orange-50 border border-orange-100 p-3 rounded-lg flex items-start gap-2">
+                  <Gift size={16} className="text-[#fb7701] mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-orange-800 font-bold">
+                    {unselectedInStockCount} item{unselectedInStockCount === 1 ? '' : 's'} unchecked &mdash; they&apos;ll stay in your cart for later.
+                  </p>
+                </div>
+              )}
               <button
                 onClick={handlePlaceOrder}
-                disabled={loading}
-                className="w-full mt-6 bg-[#fb7701] text-white py-4 rounded-full font-bold text-lg hover:bg-[#e06a01] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                disabled={loading || selectedItems.length === 0}
+                className="w-full mt-6 bg-[#fb7701] text-white py-4 rounded-full font-bold text-lg hover:bg-[#e06a01] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <Loader2 className="animate-spin" />
                 ) : (
                   <>
-                    Place Order <ArrowRight size={20} />
+                    {isPartialOrder ? `Place Partial Order (${selectedItems.length})` : 'Place Order'} <ArrowRight size={20} />
                   </>
                 )}
               </button>

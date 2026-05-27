@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { productService } from '../../services/productService';
 import { Plus, Edit, Trash2, Package, RotateCcw, ShoppingCart, X, CreditCard } from 'lucide-react';
@@ -36,7 +36,7 @@ const SellerDashboard = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    
+
     // Fetch Categories
     try {
       const categoriesData = await productService.getCategories();
@@ -89,10 +89,43 @@ const SellerDashboard = () => {
     price: '',
     stock: '',
     category_id: '',
-    images: []
+    images: [],
+    attributes: {}
   });
+  const [categoryAttributes, setCategoryAttributes] = useState([]);
+  // Which attribute keys the seller has explicitly added for this product
+  const [activeAttrKeys, setActiveAttrKeys] = useState([]);
+  const [attrPickerKey, setAttrPickerKey] = useState('');
   const [imageUploading, setImageUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!formData.category_id) { setCategoryAttributes([]); return; }
+    api.get(`/products/categories/${formData.category_id}/attributes`)
+      .then(res => setCategoryAttributes(res.data))
+      .catch(() => setCategoryAttributes([]));
+  }, [formData.category_id]);
+
+  // Cascading dropdown state — track each level the user picks
+  const [catL1, setCatL1] = useState('');
+  const [catL2, setCatL2] = useState('');
+
+  const l1Categories = useMemo(() => categories.filter(c => !c.parent_id), [categories]);
+  const l2Categories = useMemo(() => catL1 ? categories.filter(c => c.parent_id === catL1) : [], [catL1, categories]);
+  const l3Categories = useMemo(() => catL2 ? categories.filter(c => c.parent_id === catL2) : [], [catL2, categories]);
+
+  // When editing an existing product, walk up the tree to set L1/L2/L3 from category_id
+  useEffect(() => {
+    if (!formData.category_id || categories.length === 0) return;
+    const cat = categories.find(c => c.id === formData.category_id);
+    if (!cat) return;
+    if (!cat.parent_id) { setCatL1(cat.id); setCatL2(''); return; }
+    const parent = categories.find(c => c.id === cat.parent_id);
+    if (!parent) return;
+    if (!parent.parent_id) { setCatL1(parent.id); setCatL2(cat.id); return; }
+    setCatL1(parent.parent_id); setCatL2(parent.id);
+  }, [formData.category_id, categories]);
+
   const [processingIds, setProcessingIds] = useState(new Set());
   const [timeRange, setTimeRange] = useState('7d'); // '7d', '1m', '3m', '6m', '1y', 'custom'
   const [customRange, setCustomRange] = useState({ start: '', end: '' });
@@ -152,23 +185,31 @@ const SellerDashboard = () => {
   const handleOpenModal = (product = null) => {
     if (product) {
       setEditingProduct(product);
+      const attrs = product.attributes || {};
+      setActiveAttrKeys(Object.keys(attrs));
       setFormData({
         title: product.title,
         description: product.description || '',
         price: product.price,
         stock: product.stock,
         category_id: product.category_id,
-        images: product.images ? product.images.map(img => img.url) : []
+        images: product.images ? product.images.map(img => img.url) : [],
+        attributes: attrs
       });
     } else {
       setEditingProduct(null);
+      setCatL1('');
+      setCatL2('');
+      setActiveAttrKeys([]);
+      setAttrPickerKey('');
       setFormData({
         title: '',
         description: '',
         price: '',
         stock: '',
-        category_id: categories.length > 0 ? categories[0].id : '',
-        images: []
+        category_id: '',
+        images: [],
+        attributes: {}
       });
     }
     setIsModalOpen(true);
@@ -241,6 +282,20 @@ const SellerDashboard = () => {
     }
   };
 
+  // All per-seller figures come from the backend (compute_seller_share) so
+  // every dashboard sees the same slice of the order pie.
+  const orderGrossAmount = (o) =>
+    o.seller_subtotal != null ? o.seller_subtotal : (o.total_amount || 0);
+  const orderFee = (o) => o.seller_fee ?? 0;
+  const orderRefund = (o) => {
+    if (o.seller_refund != null) return o.seller_refund;
+    return (o.returns || [])
+      .filter(r => r.status === 'approved' || r.status === 'refunded')
+      .reduce((s, r) => s + (r.refund_amount || 0), 0);
+  };
+  const orderNetAmount = (o) =>
+    o.seller_net != null ? o.seller_net : Math.max(0, orderGrossAmount(o) - orderFee(o) - orderRefund(o));
+
   const getSalesData = () => {
     const now = new Date();
     let startDate = new Date();
@@ -291,7 +346,7 @@ const SellerDashboard = () => {
       while (curr <= endDate) {
         const label = curr.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
         const sales = filteredOrders.filter(o => new Date(o.created_at).toDateString() === curr.toDateString())
-          .reduce((sum, o) => sum + o.total_amount, 0);
+          .reduce((sum, o) => sum + orderNetAmount(o), 0);
         data.push({ label, sales });
         curr.setDate(curr.getDate() + 1);
       }
@@ -309,7 +364,7 @@ const SellerDashboard = () => {
         const sales = filteredOrders.filter(o => {
           const d = new Date(o.created_at);
           return d.getMonth() === m && d.getFullYear() === y;
-        }).reduce((sum, o) => sum + o.total_amount, 0);
+        }).reduce((sum, o) => sum + orderNetAmount(o), 0);
         data.push({ label, sales });
         curr.setMonth(curr.getMonth() + 1);
       }
@@ -328,7 +383,7 @@ const SellerDashboard = () => {
         const sales = filteredOrders.filter(o => {
           const d = new Date(o.created_at);
           return d >= startOfWeek && d <= endOfWeek;
-        }).reduce((sum, o) => sum + o.total_amount, 0);
+        }).reduce((sum, o) => sum + orderNetAmount(o), 0);
         
         data.push({ label, sales });
         curr.setDate(curr.getDate() + 7);
@@ -339,7 +394,10 @@ const SellerDashboard = () => {
     return [];
   };
 
-  const totalRevenue = orders.reduce((sum, o) => sum + o.total_amount, 0);
+  const totalGross = orders.reduce((sum, o) => sum + orderGrossAmount(o), 0);
+  const totalFees = orders.reduce((sum, o) => sum + orderFee(o), 0);
+  const totalRefunds = orders.reduce((sum, o) => sum + orderRefund(o), 0);
+  const totalRevenue = Math.max(0, totalGross - totalFees - totalRefunds);
   const totalOrders = orders.length;
   const activeProducts = products.length;
 
@@ -373,30 +431,38 @@ const SellerDashboard = () => {
       </motion.div>
 
       {/* Stats Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-          <StatCard 
-            title="Total Revenue" 
-            value={`$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} 
-            icon={<CreditCard size={24} />} 
-            trend="+12.5%" 
+          <StatCard
+            title="Net Earnings"
+            value={`$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+            icon={<CreditCard size={24} />}
+            trend={totalRefunds > 0 ? `-$${totalRefunds.toLocaleString(undefined, { minimumFractionDigits: 2 })} refunded` : null}
           />
         </motion.div>
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-          <StatCard 
-            title="Total Orders" 
-            value={totalOrders} 
-            icon={<ShoppingCart size={24} />} 
-            trend={`+${orders.filter(o => new Date(o.created_at) > new Date(Date.now() - 86400000)).length} today`} 
+          <StatCard
+            title="Total Orders"
+            value={totalOrders}
+            icon={<ShoppingCart size={24} />}
+            trend={`+${orders.filter(o => new Date(o.created_at) > new Date(Date.now() - 86400000)).length} today`}
           />
         </motion.div>
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
-          <StatCard 
-            title="Active Products" 
-            value={activeProducts} 
-            icon={<Package size={24} />} 
+          <StatCard
+            title="Active Products"
+            value={activeProducts}
+            icon={<Package size={24} />}
           />
         </motion.div>
+      </div>
+
+      {/* Tiny breakdown under the cards so the seller knows what was deducted */}
+      <div className="mb-12 flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] font-bold text-gray-400 px-1">
+        <span title="Your items + shipping fees customers paid">Gross credited (items + shipping): <span className="text-gray-700">${totalGross.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></span>
+        <span title="Platform commission on your items">− Commission: <span className="text-gray-700">${totalFees.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></span>
+        <span title="Refunds paid to customers (commission credited back)">− Refunds: <span className="text-gray-700">${totalRefunds.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></span>
+        <span>= Net to your account: <span className="text-emerald-600">${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
@@ -475,8 +541,13 @@ const SellerDashboard = () => {
                 <Plus size={20} />
                 <p className="text-[10px] font-black uppercase">Add Prod</p>
               </button>
-              <button 
-                onClick={() => setActiveTab('orders')}
+              <button
+                onClick={() => {
+                  setActiveTab('orders');
+                  setTimeout(() => {
+                    document.getElementById('seller-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 0);
+                }}
                 className="bg-gray-900 text-white rounded-2xl p-6 flex flex-col items-center justify-center gap-2 hover:bg-black transition-all shadow-lg shadow-gray-100"
               >
                 <ShoppingCart size={20} />
@@ -500,7 +571,7 @@ const SellerDashboard = () => {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-4 mb-8 bg-gray-100 p-1.5 rounded-2xl w-fit">
+      <div id="seller-tabs" className="flex flex-wrap gap-4 mb-8 bg-gray-100 p-1.5 rounded-2xl w-fit scroll-mt-6">
         <button 
           onClick={() => setActiveTab('products')}
           className={`px-8 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'products' ? 'bg-white text-[#fb7701] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
@@ -779,7 +850,15 @@ const SellerDashboard = () => {
               exit={{ x: '100%' }}
               className="relative w-full max-w-lg h-full bg-white shadow-2xl p-10 overflow-y-auto"
             >
-              <h2 className="text-3xl font-black mb-8">{editingProduct ? 'Edit Product' : 'Add New Product'}</h2>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                aria-label="Close"
+                className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <X size={18} />
+              </button>
+              <h2 className="text-3xl font-black mb-8 pr-12">{editingProduct ? 'Edit Product' : 'Add New Product'}</h2>
               
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
@@ -822,20 +901,185 @@ const SellerDashboard = () => {
 
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Category</label>
-                  <select 
+                  <select
                     required
-                    value={formData.category_id}
-                    onChange={(e) => setFormData({...formData, category_id: e.target.value})}
+                    value={catL1}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setCatL1(id);
+                      setCatL2('');
+                      setActiveAttrKeys([]);
+                      setAttrPickerKey('');
+                      setFormData(prev => ({...prev, category_id: id, attributes: {}}));
+                    }}
                     className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-[#fb7701] outline-none font-bold"
                   >
                     <option value="" disabled>
                       {categories.length === 0 ? "Loading categories..." : "Select Category"}
                     </option>
-                    {categories.map(cat => (
+                    {l1Categories.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
                   </select>
                 </div>
+
+                {l2Categories.length > 0 && (
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Sub-Category</label>
+                    <select
+                      value={catL2}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setCatL2(id);
+                        setActiveAttrKeys([]);
+                        setAttrPickerKey('');
+                        setFormData(prev => ({...prev, category_id: id || catL1, attributes: {}}));
+                      }}
+                      className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-[#fb7701] outline-none font-bold"
+                    >
+                      <option value="">Select Sub-Category</option>
+                      {l2Categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {l3Categories.length > 0 && (
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Product</label>
+                    <select
+                      value={l3Categories.find(c => c.id === formData.category_id) ? formData.category_id : ''}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setFormData(prev => ({...prev, category_id: id || catL2, attributes: {}}));
+                      }}
+                      className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-[#fb7701] outline-none font-bold"
+                    >
+                      <option value="">Select Product</option>
+                      {l3Categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {categoryAttributes.length > 0 && (() => {
+                  const availableToAdd = categoryAttributes.filter(a => !activeAttrKeys.includes(a.key));
+                  const renderAttrInput = (attr) => {
+                    if (attr.field_type === 'select' && attr.options) {
+                      return (
+                        <select
+                          value={formData.attributes[attr.key] || ''}
+                          onChange={e => setFormData(prev => ({
+                            ...prev,
+                            attributes: { ...prev.attributes, [attr.key]: e.target.value }
+                          }))}
+                          className="flex-1 p-3 bg-white border-2 border-gray-100 rounded-xl focus:border-[#fb7701] outline-none font-bold text-sm"
+                        >
+                          <option value="">Select {attr.label}</option>
+                          {attr.options.map(opt => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      );
+                    }
+                    if (attr.field_type === 'boolean') {
+                      return (
+                        <select
+                          value={formData.attributes[attr.key] ?? ''}
+                          onChange={e => setFormData(prev => ({
+                            ...prev,
+                            attributes: { ...prev.attributes, [attr.key]: e.target.value }
+                          }))}
+                          className="flex-1 p-3 bg-white border-2 border-gray-100 rounded-xl focus:border-[#fb7701] outline-none font-bold text-sm"
+                        >
+                          <option value="">Select</option>
+                          <option value="true">Yes</option>
+                          <option value="false">No</option>
+                        </select>
+                      );
+                    }
+                    return (
+                      <input
+                        type={attr.field_type === 'number' ? 'number' : 'text'}
+                        value={formData.attributes[attr.key] || ''}
+                        onChange={e => setFormData(prev => ({
+                          ...prev,
+                          attributes: { ...prev.attributes, [attr.key]: e.target.value }
+                        }))}
+                        className="flex-1 p-3 bg-white border-2 border-gray-100 rounded-xl focus:border-[#fb7701] outline-none font-bold text-sm"
+                        placeholder={`Enter ${attr.label}`}
+                      />
+                    );
+                  };
+
+                  return (
+                    <div className="space-y-3 bg-gray-50 p-5 rounded-2xl border border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Specifications</p>
+                        <span className="text-[10px] text-gray-400">{activeAttrKeys.length} added</span>
+                      </div>
+
+                      {activeAttrKeys.length === 0 && (
+                        <p className="text-xs text-gray-400 italic">No specs added yet. Pick one from the list below.</p>
+                      )}
+
+                      {activeAttrKeys.map(key => {
+                        const attr = categoryAttributes.find(a => a.key === key);
+                        if (!attr) return null;
+                        return (
+                          <div key={key} className="flex items-center gap-2">
+                            <span className="w-28 text-xs font-black uppercase tracking-wider text-gray-600 flex-shrink-0">{attr.label}</span>
+                            {renderAttrInput(attr)}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveAttrKeys(prev => prev.filter(k => k !== key));
+                                setFormData(prev => {
+                                  const next = { ...prev.attributes };
+                                  delete next[key];
+                                  return { ...prev, attributes: next };
+                                });
+                              }}
+                              className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0 p-1"
+                              aria-label="Remove specification"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        );
+                      })}
+
+                      {availableToAdd.length > 0 && (
+                        <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+                          <select
+                            value={attrPickerKey}
+                            onChange={e => setAttrPickerKey(e.target.value)}
+                            className="flex-1 p-3 bg-white border-2 border-dashed border-gray-200 rounded-xl text-sm font-bold focus:border-[#fb7701] outline-none"
+                          >
+                            <option value="">Select a specification to add…</option>
+                            {availableToAdd.map(a => (
+                              <option key={a.key} value={a.key}>{a.label}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            disabled={!attrPickerKey}
+                            onClick={() => {
+                              if (!attrPickerKey) return;
+                              setActiveAttrKeys(prev => [...prev, attrPickerKey]);
+                              setAttrPickerKey('');
+                            }}
+                            className="bg-[#fb7701] text-white px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#e06a01] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                          >
+                            <Plus size={14} /> Add
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Description</label>

@@ -71,6 +71,9 @@ class OrderBase(BaseModel):
 class OrderCreate(OrderBase):
     reward_id: Optional[UUID] = None
     payment_method_id: Optional[UUID] = None
+    # When provided, only these cart items are placed in the order; the rest
+    # remain in the cart. Omit (or send None) to order the entire cart.
+    cart_item_ids: Optional[List[UUID]] = None
 
 class OrderResponse(OrderBase):
     id: UUID
@@ -83,6 +86,12 @@ class OrderResponse(OrderBase):
     shipments: List[ShipmentResponse] = []
     returns: List[ReturnResponse] = []
     customer_name: Optional[str] = None
+    # Populated when fetched through the seller dashboard. The seller's slice of
+    # a (potentially multi-seller) order. fee is the platform's commission cut.
+    seller_subtotal: Optional[float] = None  # prorated share of order.total_amount
+    seller_fee: Optional[float] = None       # platform commission on seller's items
+    seller_refund: Optional[float] = None    # refunds attributed to seller (commission-adjusted)
+    seller_net: Optional[float] = None       # subtotal − fee − refund
 
     class Config:
         from_attributes = True

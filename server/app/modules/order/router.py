@@ -4,7 +4,7 @@ from app.db.session import get_db
 from app.modules.order import schemas, services, models
 from app.modules.user.router import get_current_user
 from app.modules.user.models import User, UserRole
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 router = APIRouter()
@@ -15,7 +15,14 @@ def create_new_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return services.create_order(db, current_user.id, order_in.shipping_address, order_in.reward_id, order_in.payment_method_id)
+    return services.create_order(
+        db,
+        current_user.id,
+        order_in.shipping_address,
+        order_in.reward_id,
+        order_in.payment_method_id,
+        cart_item_ids=order_in.cart_item_ids,
+    )
 
 @router.get("/", response_model=List[schemas.OrderResponse])
 def read_my_orders(
@@ -92,7 +99,8 @@ def process_return(
 ):
     if current_user.role not in [UserRole.ADMIN, UserRole.SELLER]:
         raise HTTPException(status_code=403, detail="Only admins or sellers can process returns")
-    return services.process_return_request(db, current_user.id, return_id, approved, reason)
+    is_admin = current_user.role == UserRole.ADMIN
+    return services.process_return_request(db, current_user.id, return_id, approved, reason, is_admin=is_admin)
 
 @router.get("/seller/orders", response_model=List[schemas.OrderResponse])
 def read_seller_orders(
@@ -110,7 +118,9 @@ def read_seller_returns(
 ):
     if current_user.role not in [UserRole.SELLER, UserRole.ADMIN]:
         raise HTTPException(status_code=403, detail="Only sellers can view return requests")
-    
-    # If Admin, fetch all returns. If Seller, fetch only theirs.
-    seller_id = current_user.id if current_user.role == UserRole.SELLER else None
-    return services.get_seller_returns(db, seller_id)
+
+    # Sellers see their own returns (all statuses). Admins see only disputes —
+    # returns the seller has rejected — so untouched return requests stay with the seller.
+    is_admin = current_user.role == UserRole.ADMIN
+    seller_id = None if is_admin else current_user.id
+    return services.get_seller_returns(db, seller_id, admin_view=is_admin)

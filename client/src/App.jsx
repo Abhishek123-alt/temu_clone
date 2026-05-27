@@ -6,6 +6,7 @@ import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ProfilePage from './pages/profile/ProfilePage';
 import QuestsPage from './pages/profile/QuestsPage';
+import MiniGamesPage from './pages/profile/MiniGamesPage';
 import WishlistPage from './pages/wishlist/WishlistPage';
 import AddressesPage from './pages/profile/AddressesPage';
 import PaymentMethodsPage from './pages/profile/PaymentMethodsPage';
@@ -41,30 +42,9 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route 
-            path="/" 
-            element={
-              <ProtectedRoute>
-                <HomePage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/deals" 
-            element={
-              <ProtectedRoute>
-                <DealsPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/new-arrivals" 
-            element={
-              <ProtectedRoute>
-                <NewArrivalsPage />
-              </ProtectedRoute>
-            } 
-          />
+          <Route path="/" element={<HomePage />} />
+          <Route path="/deals" element={<DealsPage />} />
+          <Route path="/new-arrivals" element={<NewArrivalsPage />} />
           <Route 
             path="/profile" 
             element={
@@ -73,13 +53,21 @@ function App() {
               </ProtectedRoute>
             } 
           />
-          <Route 
-            path="/profile/quests" 
+          <Route
+            path="/profile/quests"
             element={
               <ProtectedRoute>
                 <QuestsPage />
               </ProtectedRoute>
-            } 
+            }
+          />
+          <Route
+            path="/profile/games"
+            element={
+              <ProtectedRoute>
+                <MiniGamesPage />
+              </ProtectedRoute>
+            }
           />
           <Route 
             path="/wishlist" 
@@ -125,14 +113,7 @@ function App() {
               </ProtectedRoute>
             } 
           />
-          <Route 
-            path="/cart" 
-            element={
-              <ProtectedRoute>
-                <CartPage />
-              </ProtectedRoute>
-            } 
-          />
+          <Route path="/cart" element={<CartPage />} />
           <Route 
             path="/checkout" 
             element={
@@ -166,14 +147,7 @@ function App() {
             } 
           />
           <Route path="/product/:slug" element={<ProductDetailPage />} />
-          <Route 
-            path="/search" 
-            element={
-              <ProtectedRoute>
-                <SearchPage />
-              </ProtectedRoute>
-            } 
-          />
+          <Route path="/search" element={<SearchPage />} />
         </Routes>
       </Layout>
     </Router>

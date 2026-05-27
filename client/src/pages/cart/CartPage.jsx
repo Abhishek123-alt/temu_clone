@@ -1,16 +1,26 @@
 import React, { useEffect } from 'react';
 import { useCartStore } from '../../store/cartStore';
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 
 const CartPage = () => {
   const { items, fetchCart, updateQuantity, removeItem, getTotalPrice, getTotalItems } = useCartStore();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchCart();
-  }, []);
+    if (isAuthenticated) fetchCart();
+  }, [isAuthenticated]);
+
+  const handleCheckout = () => {
+    if (!isAuthenticated) {
+      navigate('/login?next=/checkout');
+      return;
+    }
+    navigate('/checkout');
+  };
 
   if (items.length === 0) {
     return (
@@ -27,8 +37,44 @@ const CartPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-extrabold text-gray-900 mb-10">Shopping Cart ({getTotalItems()})</h1>
-      
+      <h1 className="text-3xl font-extrabold text-gray-900 mb-6">Shopping Cart ({getTotalItems()})</h1>
+
+      {!isAuthenticated && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-orange-100 bg-orange-50 p-5"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-orange-100">
+              <Lock size={18} className="text-[#fb7701]" />
+            </div>
+            <div>
+              <p className="text-sm font-black uppercase tracking-wide text-[#fb7701]">
+                Sign in to checkout
+              </p>
+              <p className="mt-1 text-sm font-medium text-orange-700">
+                Your items are saved on this device. Create a free account or sign in to complete your purchase.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Link
+              to="/login?next=/checkout"
+              className="rounded-full bg-[#fb7701] px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-600 transition-all"
+            >
+              Sign In
+            </Link>
+            <Link
+              to="/register?next=/checkout"
+              className="rounded-full border border-orange-200 bg-white px-5 py-2.5 text-sm font-bold text-[#fb7701] hover:bg-orange-50 transition-all"
+            >
+              Join Free
+            </Link>
+          </div>
+        </motion.div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         {/* Cart Items List */}
         <div className="lg:col-span-2 space-y-6">
@@ -109,11 +155,15 @@ const CartPage = () => {
               </div>
             </div>
 
-            <button 
-              onClick={() => navigate('/checkout')}
+            <button
+              onClick={handleCheckout}
               className="w-full btn-primary py-4 text-lg flex items-center justify-center gap-2"
             >
-              Checkout Now <ArrowRight size={20} />
+              {isAuthenticated ? (
+                <>Checkout Now <ArrowRight size={20} /></>
+              ) : (
+                <><Lock size={18} /> Sign in to Checkout</>
+              )}
             </button>
 
             <div className="mt-6 flex flex-wrap gap-2 justify-center opacity-40 grayscale">
